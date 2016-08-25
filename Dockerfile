@@ -3,8 +3,7 @@ FROM alpine
 MAINTAINER Nikolay Denev <ndenev@gmail.com>
 
 RUN apk add --no-cache bash py-pip && \
-    pip install --upgrade pip && \
-    pip install -r requirements.txt
+    pip install --upgrade pip
 
 ENV APP_DIR /app
 
@@ -13,8 +12,7 @@ RUN mkdir ${APP_DIR} && \
 
 COPY app /app
 WORKDIR ${APP_DIR}
-
-#EXPOSE 8080
+RUN pip install -r requirements.txt
 
 USER "nobody"
 
