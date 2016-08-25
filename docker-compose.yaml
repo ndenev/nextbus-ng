@@ -1,57 +1,58 @@
-nextbus-web-1:
-  build: .
-  expose:
-   - "8080"
+version: "2"
 
-nextbus-web-2:
-  build: .
-  expose:
-   - "8080"
-
-nextbus-web-3:
-  build: .
-  expose:
-   - "8080"
-
-nextbus-web-4:
-  build: .
-  expose:
-   - "8080"
-
-redis-1:
-  image: redis:alpine
-  links:
-   - redis-2
-
-redis-2:
-  image: redis:alpine
-  links:
-   - redis-1
-
-lb-1:
-  image: nginx:alpine
-  volumes:
-   - nginx/nginx.conf:/etc/nginx/nginx.conf
-  links:
-   - nextbus-web-1
-   - nextbus-web-2
-   - nextbus-web-3
-   - nextbus-web-4
-  ports:
-   - "80:80"
-  expose:
-   - "80"
-
-lb-2:
-  image: nginx:alpine
-  volumes:
-   - nginx/nginx.conf:/etc/nginx/nginx.conf
-  links:
-   - nextbus-web-1
-   - nextbus-web-2
-   - nextbus-web-3
-   - nextbus-web-4
-  ports:
-   - "80:80"
-  expose:
-   - "80"
+services:
+  nextbus-web-1:
+    build: .
+    expose:
+     - "8080"
+  
+  nextbus-web-2:
+    build: .
+    expose:
+     - "8080"
+  
+  nextbus-web-3:
+    build: .
+    expose:
+     - "8080"
+  
+  nextbus-web-4:
+    build: .
+    expose:
+     - "8080"
+  
+  redis-1:
+    image: redis:alpine
+  
+  redis-2:
+    image: redis:alpine
+    links:
+     - redis-1
+  
+  lb-1:
+    image: nginx:alpine
+    volumes:
+        - ./conf/nginx/nextbus.conf:/etc/nginx/conf.d/default.conf:ro
+    links:
+     - nextbus-web-1
+     - nextbus-web-2
+     - nextbus-web-3
+     - nextbus-web-4
+    ports:
+     - "80:80"
+    expose:
+     - "80"
+  
+  lb-2:
+    image: nginx:alpine
+    volumes:
+        - ./conf/nginx/nextbus.conf:/etc/nginx/conf.d/default.conf:ro
+    links:
+     - nextbus-web-1
+     - nextbus-web-2
+     - nextbus-web-3
+     - nextbus-web-4
+    ports:
+     - "80:80"
+    expose:
+     - "80"
