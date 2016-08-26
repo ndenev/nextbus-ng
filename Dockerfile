@@ -15,7 +15,7 @@ WORKDIR ${APP_DIR}
 RUN pip install -r requirements.txt && \
     pip install pytest pytest-coverage && \
     pytest -vvv --cov=nextbus && \
-    pip remove pytest pytest-coverage 
+    pip uninstall -y pytest-coverage pytest
 
 USER "nobody"
 
