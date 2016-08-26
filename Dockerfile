@@ -12,7 +12,10 @@ RUN mkdir ${APP_DIR} && \
 
 COPY app /app
 WORKDIR ${APP_DIR}
-RUN pip install -r requirements.txt
+RUN pip install -r requirements.txt && \
+    pip install pytest pytest-coverage && \
+    pytest -vvv --cov=nextbus && \
+    pip remove pytest pytest-coverage 
 
 USER "nobody"
 
