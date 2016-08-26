@@ -2,7 +2,7 @@ FROM alpine
 
 MAINTAINER Nikolay Denev <ndenev@gmail.com>
 
-RUN apk add --no-cache bash py-pip && \
+RUN apk add --no-cache bash uwsgi uwsgi-python py-pip && \
     pip install --upgrade pip
 
 ENV APP_DIR /app
@@ -10,7 +10,7 @@ ENV APP_DIR /app
 RUN mkdir ${APP_DIR} && \
     chown -R nobody:nobody ${APP_DIR}
 
-COPY app /app
+COPY . /app/
 WORKDIR ${APP_DIR}
 RUN pip install -r requirements.txt && \
     pip install pytest pytest-coverage && \
@@ -19,6 +19,9 @@ RUN pip install -r requirements.txt && \
 
 USER "nobody"
 
-CMD python ${APP_DIR}/run.py
+# DEV
+# ENTRYPOINT python
+# CMD ${APP_DIR}/run.py
+# PROD
 
-
+ENTRYPOINT ["uwsgi", "--ini", "/app/app.ini"]
