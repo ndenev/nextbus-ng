@@ -161,7 +161,7 @@ class NextbusRouteStop(NextbusObject):
         pass
 
 
-#@app.cache.memoize(CACHE_TTL)
+@app.cache.memoize(CACHE_TTL)
 def _cached_request(endpoint, headers, timeout, params):
     """ Wrapper function around request get so we can more
     easily memoize it without having to deal with the class
@@ -173,11 +173,18 @@ def _cached_request(endpoint, headers, timeout, params):
 
     if root.tag != 'body':
         raise NextbusApiError
+    return _xml_process(root)
 
-    objects = []
+def _xml_process(root):
+    objects = {}
     for child in root:
         #objects.append(NextbusObject.factory(child.tag, child.attrib))
-        objects.append({child.tag: child.attrib})
+        if child.attrib is type(dict):
+            if child.tag in objects: 
+                objects[child.tag].append(child.attrib)
+            else:
+                objects.update({child.tag: [child.attrib]})
+
     return objects
 
 class NextbusApiClient(object):
