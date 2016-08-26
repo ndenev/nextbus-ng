@@ -5,7 +5,7 @@ import random
 from flask_restful import Resource
 
 from nextbus import app
-#from nextbus.common.nextbusapi import NextbusApiClient
+from nextbus.common.nextbusapi import NextbusApiClient
 
 
 class NextBus(Resource):

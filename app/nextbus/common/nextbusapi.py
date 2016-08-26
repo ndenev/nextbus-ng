@@ -129,9 +129,6 @@ class NextbusRoute(NextbusObject):
 
 
 
-
-
-
 class NextbusApiClient(object):
     def __init__(agency):
         self.agency = agency
