@@ -1,9 +1,12 @@
-from nextbus import app
 import time
 import string
 import random
 
 from flask_restful import Resource
+
+from nextbus import app
+from nextbus.common.nextbusapi import NextbusApiClient
+
 
 class NextBus(Resource):
     def get(self):
