@@ -1,8 +1,12 @@
+import sys
 from nextbus import app
 import xml.etree.ElementTree as ET
 import requests
 
-ENDPOINT='http://webservices.nextbus.com/service/publicXMLFeed'
+DEFAULT_AGENCY='sf-muni'
+DEFAULT_ENDPOINT='http://webservices.nextbus.com/service/publicXMLFeed'
+#CACHE_TTL=30
+CACHE_TTL=300
 
 # http://www.nextbus.com/xmlFeedDocs/NextBusXMLFeed.pdf
 
@@ -62,21 +66,39 @@ class NextbuApiFatalError(NextbusApiError):
 
 
 class NextbusObject(object):
+    _obj_map = {'Error': 'NextbusApiError',
+                'agency': 'NextbusAgency',
+                'route': 'NextbusRoute',
+                'direction': 'NextbusDirection',
+                'stop': 'NextbusStop',
+                'path': 'NextbusPath',
+                'point': 'NextbusPoint',
+                'predictions': 'NextbusPredictions',
+                'prediction': 'NextbusPrediction',
+                'message': 'NextbusMessage'}
+    _attributes = []
+    def __init__(self, **params):
+        self._data = {a: params.get(a, None) for a in self._attributes}
+
+    @classmethod
+    def factory(cls, t, d):
+        return getattr(sys.modules[__name__],
+                       cls._obj_map.get(t, NextbusApiError))(**d)
+
     def serialize(self):
-        # return {k: v for k, v in self._data.items()}
         return self._data
+
     def __repr__(self):
-        return "{}<{}>".format(self.__class__.__name__,
-                               self._data)
+        print "{}".format({self.__class__.__name__: self._data})
+        return "{}".format({self.__class__.__name__: self._data})
+
 
 
 class NextbusAgency(NextbusObject):
     """ Agency class """
-    def __init__(tag, title, region_title, short_title=None):
-        self._data = {'tag': tag,
-                      'title': title,
-                      'shortTitle': short_title,
-                      'regionTitle': region_title}
+    _attributes = ['tag', 'title', 'shortTitle', 'regionTitle']
+    def __init__(self, **params):
+        super(NextbusAgency, self).__init__(**params)
 
     @property
     def tag(self):
@@ -104,11 +126,10 @@ class NextbusAgency(NextbusObject):
 
 
 class NextbusRoute(NextbusObject):
-    """ Bus route class """
-    def __init__(tag, title, short_title=None):
-        self._data = {'tag': tag,
-                      'title': title,
-                      'shortTitle': short_title}
+    """ Bus route class. """
+    _attributes = ['tag', 'title', 'shortTitle']
+    def __init__(self, **params):
+        super(NextbusRoute, self).__init__(**params)
 
     @property
     def tag(self):
@@ -128,18 +149,65 @@ class NextbusRoute(NextbusObject):
         return self._data.get('shortTitle', self.title)
 
 
+class NextbusRouteConfig(NextbusObject):
+    """ Bus route configuration object. """
+    """ useForUI """
+    """ verbose """
+    def __init__(self, tag, title):
+        pass
+
+class NextbusRouteStop(NextbusObject):
+    def __init__(self):
+        pass
+
+
+#@app.cache.memoize(CACHE_TTL)
+def _cached_request(endpoint, headers, timeout, params):
+    """ Wrapper function around request get so we can more
+    easily memoize it without having to deal with the class
+    instance.
+    """
+    r = requests.get(endpoint, headers=headers, timeout=timeout, params=params)
+    r.raise_for_status()
+    root = ET.fromstring(r.text)
+
+    if root.tag != 'body':
+        raise NextbusApiError
+
+    objects = []
+    for child in root:
+        #objects.append(NextbusObject.factory(child.tag, child.attrib))
+        objects.append({child.tag: child.attrib})
+    return objects
 
 class NextbusApiClient(object):
-    def __init__(agency):
+    def __init__(self, agency=DEFAULT_AGENCY, endpoint=DEFAULT_ENDPOINT):
         self.agency = agency
+        self.endpoint = endpoint
+        self.headers = {'content-type': 'application/json'}
+        self.timeout = 10
+
+
+    def _make_request(self, command, params={}):
+       params.update({'command': command})
+       return _cached_request(self.endpoint,
+                              headers=self.headers,
+                              timeout=self.timeout,
+                              params=params)
 
     def agency_list(self):
-        pass
+        command = 'agencyList'
+        return self._make_request(command)
 
     def route_list(self):
-        pass
+        command = 'routeList'
+        return self._make_request(command, params={'a': self.agency})
 
     def route_config(self, route_tag=None):
-        pass
+        command = 'routeConfig'
+        params = {'a': self.agency}
+        if route_tag is not None:
+            params.update({'r': route_tag})
+        return self._make_request(command, params=params)
 
 

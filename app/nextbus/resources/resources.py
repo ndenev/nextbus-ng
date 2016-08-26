@@ -8,16 +8,19 @@ from nextbus import app
 from nextbus.common.nextbusapi import NextbusApiClient
 
 
-class NextBus(Resource):
-    def get(self):
-        return {'hello': 'world'}
 
-class NextBusCached(Resource):
-    @app.cache.memoize(30)
+class Agency(Resource):
     def get(self):
-        time.sleep(2)
-        return {'random': ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(32))}
-    def __repr__(self):
-        return "NextBusCached"
+        nb_api = NextbusApiClient()
+        return nb_api.agency_list()
 
+class Routes(Resource):
+    def get(self):
+        nb_api = NextbusApiClient()
+        return nb_api.route_list()
+
+class RouteConfig(Resource):
+    def get(self, route_tag=None):
+        nb_api = NextbusApiClient()
+        return nb_api.route_config(route_tag)
 
