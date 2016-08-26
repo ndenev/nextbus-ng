@@ -12,7 +12,8 @@ RUN mkdir ${APP_DIR} && \
 
 COPY . /app/
 WORKDIR ${APP_DIR}
-RUN pip install -r requirements.txt && \
+RUN find . -name '*.pyc' -delete && \
+    pip install -r requirements.txt && \
     pip install pytest pytest-coverage && \
     pytest -vvv --cov=nextbus && \
     pip uninstall -y pytest-coverage pytest
