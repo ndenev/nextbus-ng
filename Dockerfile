@@ -16,7 +16,6 @@ RUN pip install -r requirements.txt
 
 USER "nobody"
 
-ENTRYPOINT ["python"]
-CMD ["app.py"]
+CMD python ${APP_DIR}/run.py
 
 
