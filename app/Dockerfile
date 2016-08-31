@@ -10,7 +10,7 @@ ENV APP_DIR /app
 RUN mkdir ${APP_DIR} && \
     chown -R nobody:nobody ${APP_DIR}
 
-COPY * /app
+COPY * /app/
 WORKDIR ${APP_DIR}
 RUN pip install -r requirements.txt && \
     pip install pytest pytest-coverage && \
