@@ -1,14 +1,14 @@
-nexbus-web-1:
+nextbus-web-1:
   build: .
   expose:
    - "8080"
 
-nexbus-web-2:
+nextbus-web-2:
   build: .
   expose:
    - "8080"
 
-nexbus-web-3:
+nextbus-web-3:
   build: .
   expose:
    - "8080"
