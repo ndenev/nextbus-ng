@@ -2,7 +2,7 @@ FROM alpine
 
 MAINTAINER Nikolay Denev <ndenev@gmail.com>
 
-RUN apk add --no-cache bash uwsgi py-pip && \
+RUN apk add --no-cache bash uwsgi uwsgi-python py-pip && \
     pip install --upgrade pip
 
 ENV APP_DIR /app
