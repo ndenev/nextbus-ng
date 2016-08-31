@@ -1,37 +1,16 @@
 version: "2"
 
 services:
-  nextbus-web-1:
+  nextbus-web:
     build: .
     restart: always
     volumes:
      - ./app:/app:ro
     expose:
      - "8080"
-  
-  nextbus-web-2:
-    build: .
-    restart: always
-    volumes:
-     - ./app:/app:ro
-    expose:
-     - "8080"
-  
-  nextbus-web-3:
-    build: .
-    restart: always
-    volumes:
-     - ./app:/app:ro
-    expose:
-     - "8080"
-  
-  nextbus-web-4:
-    build: .
-    restart: always
-    volumes:
-     - ./app:/app:ro
-    expose:
-     - "8080"
+    environment:
+     - VIRTUAL_HOST=nextbus-web
+     - VIRTUAL_PORT=8080
   
   redis-1:
     image: redis:alpine
@@ -46,31 +25,30 @@ services:
      - "6379"
   
   lb-1:
-    image: nginx:alpine
+    build: ./conf/nginx
     restart: always
     volumes:
-        - ./conf/nginx/nextbus.conf:/etc/nginx/nginx.conf:ro
+        - /var/run/docker.sock:/tmp/docker.sock:ro
     links:
-     - nextbus-web-1
-     - nextbus-web-2
-     - nextbus-web-3
-     - nextbus-web-4
+     - nextbus-web
+    depends_on:
+     - nextbus-web
     ports:
      - "80:80"
     expose:
      - "80"
-  
-  lb-2:
-    image: nginx:alpine
-    restart: always
-    volumes:
-        - ./conf/nginx/nextbus.conf:/etc/nginx/nginx.conf:ro
-    links:
-     - nextbus-web-1
-     - nextbus-web-2
-     - nextbus-web-3
-     - nextbus-web-4
-    ports:
-     - "81:80"
-    expose:
-     - "80"
+ 
+  #lb-2:
+  #  image: nginx:alpine
+  #  restart: always
+  #  volumes:
+  #      - ./conf/nginx/nextbus.conf:/etc/nginx/nginx.conf:ro
+  #  links:
+  #   - nextbus-web-1
+  #   - nextbus-web-2
+  #   - nextbus-web-3
+  #   - nextbus-web-4
+  #  ports:
+  #   - "81:80"
+  #  expose:
+  #   - "80"

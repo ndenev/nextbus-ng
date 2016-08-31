@@ -1,0 +1,60 @@
+user nginx;
+worker_processes 4;
+
+#error_log   /var/log/nginx/error.log warn;
+pid         /var/run/nginx.pid;
+
+events {
+    worker_connections  2048;
+}
+
+http {
+    include       /etc/nginx/mime.types;
+    default_type  application/octet-stream;
+
+    log_format  main  '$remote_addr - $remote_user [$time_local] "$request" '
+                      '$status $body_bytes_sent "$http_referer" '
+                      '"$http_user_agent" "$http_x_forwarded_for"';
+
+    #access_log  /var/log/nginx/access.log  main;
+
+    sendfile        on;
+    #tcp_nopush     on;
+    keepalive_timeout  65;
+    #gzip  on;
+
+    resolver 127.0.0.1;
+
+{{ range $host, $containers := groupBy $ "Env.VIRTUAL_HOST" }}
+    upstream {{ $host }} {
+        least_conn; 
+        {{ range $index, $value := $containers }}
+          {{ $addrLen := len $value.Addresses }}
+	    {{ $network := index $value.Networks 0 }}
+              {{ if $value.Env.VIRTUAL_PORT }}
+		{{ range $i, $address := $value.Addresses }}
+  		  {{ if eq $address.Port $value.Env.VIRTUAL_PORT }}
+        # {{$value.Name}}
+        server {{ $network.IP }}:{{ $address.Port }};
+                  {{ end }}
+                {{ end }}
+              {{ else }}
+        # No containers with VIRTUAL_HOST and VIRTUAL_PORT
+        server 127.0.0.1 down;
+	  {{ end }}
+	{{ end }}
+    }
+
+    server {
+        listen 80 default_server;
+        server_name {{ trim $host }};
+	# proxy_buffering off;
+	error_log /proc/self/fd/2;
+	access_log /proc/self/fd/1 main;
+        location / {
+          uwsgi_pass {{ trim $host }};
+          include uwsgi_params;
+        }
+    }
+}
+{{ end }}
