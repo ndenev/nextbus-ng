@@ -1,0 +1,46 @@
+nexbus-web-1:
+  build: .
+  expose:
+    - 8080
+
+nexbus-web-2:
+  build: .
+  expose:
+    - 8080
+
+nexbus-web-3:
+  build: .
+  expose:
+    - 8080
+
+nextbus-web-4:
+  build: .
+  expose:
+    - 8080
+
+redis-1:
+  image: redis
+  links:
+   - redis-2
+
+redis-2:
+  image: redis
+  links:
+   - redis-1
+
+
+haproxy:
+  image: hypriot/rpi-haproxy
+  volumes:
+   - haproxy:/haproxy-override
+  links:
+   - weba
+   - webb
+   - webc
+  ports:
+   - "80:80"
+   - "70:70"
+
+  expose:
+   - "80"
+   - "70"
