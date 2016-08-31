@@ -2,12 +2,14 @@ version: "2"
 
 services:
   nextbus-web:
-    build: .
+    build: ./app
     restart: always
     volumes:
      - ./app:/app:ro
     expose:
      - "8080"
+    depends_on:
+     - redis-1
     environment:
      - VIRTUAL_HOST=nextbus-web
      - VIRTUAL_PORT=8080
@@ -37,18 +39,3 @@ services:
      - "80:80"
     expose:
      - "80"
- 
-  #lb-2:
-  #  image: nginx:alpine
-  #  restart: always
-  #  volumes:
-  #      - ./conf/nginx/nextbus.conf:/etc/nginx/nginx.conf:ro
-  #  links:
-  #   - nextbus-web-1
-  #   - nextbus-web-2
-  #   - nextbus-web-3
-  #   - nextbus-web-4
-  #  ports:
-  #   - "81:80"
-  #  expose:
-  #   - "80"
