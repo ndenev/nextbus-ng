@@ -1,12 +1,12 @@
 import sys
+from collections import defaultdict
 from nextbus import app
 import xml.etree.ElementTree as ET
 import requests
 
-DEFAULT_AGENCY='sf-muni'
-DEFAULT_ENDPOINT='http://webservices.nextbus.com/service/publicXMLFeed'
-#CACHE_TTL=30
-CACHE_TTL=300
+DEFAULT_AGENCY = 'sf-muni'
+DEFAULT_ENDPOINT = 'http://webservices.nextbus.com/service/publicXMLFeed'
+DEFAULT_CACHE_TTL = 300
 
 # http://www.nextbus.com/xmlFeedDocs/NextBusXMLFeed.pdf
 
@@ -66,9 +66,11 @@ class NextbuApiFatalError(NextbusApiError):
 
 
 class NextbusObject(object):
+    """ Base class for all Nextbus API objects/resources.
+    """
     _obj_map = {'Error': 'NextbusApiError',
                 'agency': 'NextbusAgency',
-                'route': 'NextbusRoute',
+                'route': 'NextbusRouteConfig',
                 'direction': 'NextbusDirection',
                 'stop': 'NextbusStop',
                 'path': 'NextbusPath',
@@ -77,91 +79,85 @@ class NextbusObject(object):
                 'prediction': 'NextbusPrediction',
                 'message': 'NextbusMessage'}
     _attributes = []
+
     def __init__(self, **params):
-        self._data = {a: params.get(a, None) for a in self._attributes}
+        """ Initialize the object and validate if the provided parameters
+        are valid for the specific sub class.
+        Also build getters for all attributes.
+        """
+        self._data = {}
+        for k, v in params.items():
+            if k not in self._attributes:
+                raise ValueError("Unknown attribute {} for {}",
+                                 k, self.__class__.__name__)
+            self._data[k] = v
+            setattr(self.__class__, k,
+                    property(lambda self: self._data.get(k, None)))
 
     @classmethod
-    def factory(cls, t, d):
+    def from_elem(cls, elem):
         return getattr(sys.modules[__name__],
-                       cls._obj_map.get(t, NextbusApiError))(**d)
+                       cls._obj_map.get(elem.tag,
+                                        NextbusApiError))(**elem.attrib)
 
     def serialize(self):
         return self._data
 
     def __repr__(self):
-        print "{}".format({self.__class__.__name__: self._data})
-        return "{}".format({self.__class__.__name__: self._data})
-
+        return "{}({})".format(self.__class__.__name__, self._data)
 
 
 class NextbusAgency(NextbusObject):
     """ Agency class """
     _attributes = ['tag', 'title', 'shortTitle', 'regionTitle']
+
     def __init__(self, **params):
         super(NextbusAgency, self).__init__(**params)
 
     @property
-    def tag(self):
-        """ Get the agency tag. """
-        return self._data.get('tag', None)
-    
-    @property
-    def title(self):
-        """ Get the agency title. """
-        return self._data.get('title', None)
-
-    @property
-    def short_title(self):
-        """ Get the agency short title.
+    def shortTitle(self):
+        """ Override the shortTitle getter.
         The short title might be missing in the API response,
         so in this case according to the documentation we can
         use the "title" attribute.
         """
-        return self._data.get('shortTitle', self.title)
-
-    @property
-    def region_title(self):
-        """ Get the agency region title. """
-        return self._data.get('regionTitle', None)
+        return self.shortTitle if self.shortTitle else self.title
 
 
 class NextbusRoute(NextbusObject):
     """ Bus route class. """
     _attributes = ['tag', 'title', 'shortTitle']
+
     def __init__(self, **params):
         super(NextbusRoute, self).__init__(**params)
 
     @property
-    def tag(self):
-        """ Get route tag. """
-        return self._data.get('tag', None)
-    
-    @property
-    def title(self):
-        """ Get route title. """
-        return self._data.get('title', None)
-
-    @property
-    def short_title(self):
-        """ Get short title if it exists.
-        if it doesn't fall back to regular title.
+    def shortTitle(self):
+        """ Override the shortTitle getter.
+        The short title might be missing in the API response,
+        so in this case according to the documentation we can
+        use the "title" attribute.
         """
-        return self._data.get('shortTitle', self.title)
+        return self.shortTitle if self.shortTitle else self.title
 
 
 class NextbusRouteConfig(NextbusObject):
     """ Bus route configuration object. """
     """ useForUI """
     """ verbose """
-    def __init__(self, tag, title):
-        pass
+    _attributes = ['tag', 'title', 'color', 'oppositeColor', 'stop'
+                   'direction', 'useForUI', 'latMax', 'latMin', 'lonMax', 'lonMin']
+
+    def __init__(self, **params):
+        super(NextbusRouteConfig, self).__init__(**params)
+
 
 class NextbusRouteStop(NextbusObject):
     def __init__(self):
         pass
 
 
-@app.cache.memoize(CACHE_TTL)
+@app.cache.memoize(DEFAULT_CACHE_TTL)
 def _cached_request(endpoint, headers, timeout, params):
     """ Wrapper function around request get so we can more
     easily memoize it without having to deal with the class
@@ -173,17 +169,13 @@ def _cached_request(endpoint, headers, timeout, params):
 
     if root.tag != 'body':
         raise NextbusApiError
-    return _xml_process(root)
+    return root
 
 def _xml_process(root):
-    objects = {}
+    objects = defaultdict(list)
     for child in root:
         #objects.append(NextbusObject.factory(child.tag, child.attrib))
-        if child.attrib is type(dict):
-            if child.tag in objects: 
-                objects[child.tag].append(child.attrib)
-            else:
-                objects.update({child.tag: [child.attrib]})
+        objects[child.tag].append(NextbusObject.factory(child.tag, child.attrib))
 
     return objects
 
@@ -194,27 +186,26 @@ class NextbusApiClient(object):
         self.headers = {'content-type': 'application/json'}
         self.timeout = 10
 
-
-    def _make_request(self, command, params={}):
-       params.update({'command': command})
-       return _cached_request(self.endpoint,
-                              headers=self.headers,
-                              timeout=self.timeout,
-                              params=params)
+    def _make_request(self, command, params={}, set_agency=True):
+        if set_agency:
+            params.update({'a': self.agency})
+        params.update({'command': command})
+        return _cached_request(self.endpoint,
+                               headers=self.headers,
+                               timeout=self.timeout,
+                               params=params)
 
     def agency_list(self):
-        command = 'agencyList'
-        return self._make_request(command)
+        et = self._make_request('agencyList', set_agency=False)
+        return [NextbusObject.from_elem(e) for e in et.findall('agency')]
 
     def route_list(self):
-        command = 'routeList'
-        return self._make_request(command, params={'a': self.agency})
+        et = self._make_request('routeList')
+        return [NextbusObject.from_elem(e) for e in et.findall('route')]
 
     def route_config(self, route_tag=None):
-        command = 'routeConfig'
-        params = {'a': self.agency}
+        params = {}
         if route_tag is not None:
             params.update({'r': route_tag})
-        return self._make_request(command, params=params)
-
-
+        et = self._make_request('routeConfig', params=params)
+        return [NextbusObject.from_elem(e) for e in et.findall('route')]

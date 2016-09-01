@@ -21,7 +21,10 @@ _add(Routes, '/routes')
 
 #_add(RouteSchedule, '/routes/schedule'
 
-_add(RouteConfig, '/routes/config', '/route/<route_tag>/config')
+_add(RouteConfig, '/routes/config', '/routes/config/<tag>')
+
+
+
 """
 
 _add(Predictions, '/predictions')
@@ -47,7 +50,7 @@ _add(VehicleLocations
 /stop
 /predictions/
 
-# 
+#
 #/route/<route_tag_or_tags> -> ['config', '
 #/route/<route_tag>/config
 

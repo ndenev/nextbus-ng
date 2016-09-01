@@ -1,40 +1,43 @@
 version: "2"
 
 services:
-  nextbus-web:
+  api:
     build: ./app
+    image: nextbus-ng-api
     restart: always
     volumes:
      - ./app:/app:ro
     expose:
      - "8080"
     depends_on:
-     - redis-1
+     - redis1
+     - redis2
     environment:
      - VIRTUAL_HOST=nextbus-web
      - VIRTUAL_PORT=8080
-  
-  redis-1:
+
+  redis1:
     image: redis:alpine
     expose:
      - "6379"
-  
-  redis-2:
+
+  redis2:
     image: redis:alpine
     links:
-     - redis-1
+     - redis1
     expose:
      - "6379"
-  
-  lb-1:
+
+  lb:
     build: ./conf/nginx
+    image: nextbus-ng-lb
     restart: always
     volumes:
         - /var/run/docker.sock:/tmp/docker.sock:ro
     links:
-     - nextbus-web
+     - api
     depends_on:
-     - nextbus-web
+     - api
     ports:
      - "80:80"
     expose:
