@@ -19,7 +19,8 @@ http {
     tcp_nodelay     on;
     #tcp_nopush     on;
     keepalive_timeout  65;
-    #gzip  on;
+    gzip  on;
+    gzip_types text/plain application/xml application/octet-stream application/json;
     reset_timedout_connection on;
 
     resolver 127.0.0.1;

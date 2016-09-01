@@ -1,5 +1,3 @@
-import sys
-from collections import defaultdict
 from nextbus import app
 import xml.etree.ElementTree as ET
 import requests
@@ -8,32 +6,10 @@ DEFAULT_AGENCY = 'sf-muni'
 DEFAULT_ENDPOINT = 'http://webservices.nextbus.com/service/publicXMLFeed'
 DEFAULT_CACHE_TTL = 300
 
+#
+# XML Api Specification
 # http://www.nextbus.com/xmlFeedDocs/NextBusXMLFeed.pdf
-
-'''
-Commands
-command=agencyList
-sf-muni
-
-
-Command "routeList"
-To obtain a list of routes for an agency, use the "routeList" command. The agency is specified by
-the "a" parameter in the query string. The tag for the agency as obtained from the agencyList
-command should be used.
-The format of the command is:
-    http://webservices.nextbus.com/service/publicXMLFeed?command=routeList&
-    a=<agency_tag>
-    The route list data returned has multiple attributes. These are:
-     tag  unique alphanumeric identifier for route, such as N.
-     title  the name of the route to be displayed in a User Interface, such as N-Judah.
-     shortTitle  for some transit agencies shorter titles are provided that can be useful for
-    User Interfaces where there is not much screen real estate, such as on smartphones.
-    This element is only provided where a short title is actually available. If a short title is
-    not available then the regular title element should be used.
-
-
-
-'''
+#
 
 '''
 Errors:
@@ -65,19 +41,25 @@ class NextbuApiFatalError(NextbusApiError):
     pass
 
 
+'''
+def _serialize(obj):
+    if issubclass(obj.__class__, NextbusObject):
+        ret = {}
+        for k, v in obj._nested.items():
+                ret.update({k: _serialize(v)})
+        ret.update(obj.serialize())
+        return ret
+    elif issubclass(obj.__class__, list):
+        return [_serialize(i) for i in obj]
+    elif issubclass(obj.__class__, dict):
+        return obj
+    else:
+        raise ValueError("Invalid object class.")
+'''
+
 class NextbusObject(object):
     """ Base class for all Nextbus API objects/resources.
     """
-    _obj_map = {'Error': 'NextbusApiError',
-                'agency': 'NextbusAgency',
-                'route': 'NextbusRouteConfig',
-                'direction': 'NextbusDirection',
-                'stop': 'NextbusStop',
-                'path': 'NextbusPath',
-                'point': 'NextbusPoint',
-                'predictions': 'NextbusPredictions',
-                'prediction': 'NextbusPrediction',
-                'message': 'NextbusMessage'}
     _attributes = []
 
     def __init__(self, **params):
@@ -86,6 +68,7 @@ class NextbusObject(object):
         Also build getters for all attributes.
         """
         self._data = {}
+        self._nested = {}
         for k, v in params.items():
             if k not in self._attributes:
                 raise ValueError("Unknown attribute {} for {}",
@@ -94,17 +77,15 @@ class NextbusObject(object):
             setattr(self.__class__, k,
                     property(lambda self: self._data.get(k, None)))
 
-    @classmethod
-    def from_elem(cls, elem):
-        return getattr(sys.modules[__name__],
-                       cls._obj_map.get(elem.tag,
-                                        NextbusApiError))(**elem.attrib)
+    @property
+    def nested(self):
+        return self._nested
 
     def serialize(self):
         return self._data
 
     def __repr__(self):
-        return "{}({})".format(self.__class__.__name__, self._data)
+        return "{}({})".format(self.__class__.__name__, self.__dict__)
 
 
 class NextbusAgency(NextbusObject):
@@ -145,16 +126,50 @@ class NextbusRouteConfig(NextbusObject):
     """ Bus route configuration object. """
     """ useForUI """
     """ verbose """
-    _attributes = ['tag', 'title', 'color', 'oppositeColor', 'stop'
-                   'direction', 'useForUI', 'latMax', 'latMin', 'lonMax', 'lonMin']
+    _attributes = ['tag', 'title', 'color', 'oppositeColor', 'stop',
+                   'direction', 'useForUI', 'latMax', 'latMin',
+                   'lonMax', 'lonMin']
 
-    def __init__(self, **params):
+    def __init__(self, stops, directions, paths, **params):
         super(NextbusRouteConfig, self).__init__(**params)
+        self._nested['stop'] = stops
+        self._nested['directions'] = directions
+        self._nested['path'] = paths
 
 
 class NextbusRouteStop(NextbusObject):
-    def __init__(self):
-        pass
+    _attributes = ['tag', 'title', 'shortTitle', 'lat', 'lon', 'stopId']
+
+    def __init__(self, **params):
+        super(NextbusRouteStop, self).__init__(**params)
+
+
+class NextbusDirection(NextbusObject):
+    _attributes = ['tag', 'title', 'name', 'useForUI']
+
+    def __init__(self, stops, **params):
+        super(NextbusDirection, self).__init__(**params)
+        self._nested['stop'] = stops
+
+
+class NextbusPath(NextbusObject):
+    def __init__(self, points, **params):
+        super(NextbusPath, self).__init__(**params)
+        self._nested['point'] = points
+
+
+class NextbusPoint(NextbusObject):
+    _attributes = ['lat', 'lon']
+
+    def __init__(self, **params):
+        super(NextbusPoint, self).__init__(**params)
+
+
+class NextbusDirectionStop(NextbusObject):
+    _attributes = ['tag']
+
+    def __init__(self, **params):
+        super(NextbusDirectionStop, self).__init__(**params)
 
 
 @app.cache.memoize(DEFAULT_CACHE_TTL)
@@ -165,19 +180,8 @@ def _cached_request(endpoint, headers, timeout, params):
     """
     r = requests.get(endpoint, headers=headers, timeout=timeout, params=params)
     r.raise_for_status()
-    root = ET.fromstring(r.text)
+    return ET.fromstring(r.text)
 
-    if root.tag != 'body':
-        raise NextbusApiError
-    return root
-
-def _xml_process(root):
-    objects = defaultdict(list)
-    for child in root:
-        #objects.append(NextbusObject.factory(child.tag, child.attrib))
-        objects[child.tag].append(NextbusObject.factory(child.tag, child.attrib))
-
-    return objects
 
 class NextbusApiClient(object):
     def __init__(self, agency=DEFAULT_AGENCY, endpoint=DEFAULT_ENDPOINT):
@@ -197,15 +201,30 @@ class NextbusApiClient(object):
 
     def agency_list(self):
         et = self._make_request('agencyList', set_agency=False)
-        return [NextbusObject.from_elem(e) for e in et.findall('agency')]
+        return [NextbusAgency(**e.attrib) for e in et.findall('agency')]
 
     def route_list(self):
         et = self._make_request('routeList')
-        return [NextbusObject.from_elem(e) for e in et.findall('route')]
+        return [NextbusRoute(**e.attrib) for e in et.findall('route')]
 
-    def route_config(self, route_tag=None):
+    def route_config(self, route_tag=None, verbose=False):
         params = {}
         if route_tag is not None:
             params.update({'r': route_tag})
+        if verbose is not False:
+            params.update({'verbose': True})
         et = self._make_request('routeConfig', params=params)
-        return [NextbusObject.from_elem(e) for e in et.findall('route')]
+
+        routes = []
+        for rt in et.findall('route'):
+            stops = [NextbusRouteStop(**e.attrib) for e in rt.findall('stop')]
+            dirs = []
+            for direc in rt.findall('direction'):
+                dirstp = [NextbusDirectionStop(**e.attrib) for e in direc.findall('stop')]
+                dirs.append(NextbusDirection(dirstp, **direc.attrib))
+            paths = []
+            for path in rt.findall('path'):
+                points = [NextbusPoint(**e.attrib) for e in path.findall('point')]
+                paths.append([NextbusPath(points, **path.attrib)])
+            routes.append(NextbusRouteConfig(stops, dirs, paths, **rt.attrib))
+        return routes

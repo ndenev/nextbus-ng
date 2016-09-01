@@ -1,6 +1,6 @@
-from flask_restful import Resource
+from flask_restful import reqparse, Resource
 
-from nextbus.common.nextbusapi import NextbusApiClient
+from nextbus.common.nextbusapi import NextbusObject, NextbusApiClient
 
 
 class Agency(Resource):
@@ -23,10 +23,27 @@ class Routes(Resource):
             return {'error': 'resource not found'}, 404
 
 
+def _serialize(o):
+    if issubclass(o.__class__, NextbusObject):
+        ret = o.serialize()
+        for k, v in o.nested.items():
+            ret.update({k: _serialize(v)})
+        return ret
+    elif issubclass(o.__class__, dict):
+        return o
+    elif issubclass(o.__class__, list):
+        return [_serialize(i) for i in o]
+
+
 class RouteConfig(Resource):
-    def get(self, tag=None):
+    def get(self, tag=None, verbose=False):
+        parser = reqparse.RequestParser()
+        parser.add_argument('verbose', type=bool)
+        args = parser.parse_args()
         api = NextbusApiClient()
-        routes = [r.serialize() for r in api.route_config(tag)]
+        routes = _serialize(api.route_config(tag, verbose=args.get('verbose', False)))
+        #routes = [r for r in api.route_config(tag, verbose=args.get('verbose', False))]
+
         if routes:
             return {'routeconfig': routes}
         else:
