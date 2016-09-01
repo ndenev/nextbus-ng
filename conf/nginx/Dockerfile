@@ -11,5 +11,3 @@ COPY nginx.conf.tmpl /etc/nginx/
 COPY start_nginx.sh /usr/bin/
 
 CMD start_nginx.sh
-
-

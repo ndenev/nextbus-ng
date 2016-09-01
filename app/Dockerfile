@@ -10,7 +10,7 @@ ENV APP_DIR /app
 RUN mkdir ${APP_DIR} && \
     chown -R nobody:nobody ${APP_DIR}
 
-COPY * /app/
+COPY . /app/
 WORKDIR ${APP_DIR}
 RUN pip install -r requirements.txt && \
     pip install pytest pytest-coverage && \
@@ -20,7 +20,8 @@ RUN pip install -r requirements.txt && \
 USER "nobody"
 
 # DEV
-# CMD python ${APP_DIR}/run.py
+# ENTRYPOINT python
+# CMD ${APP_DIR}/run.py
 # PROD
-CMD uwsgi --ini ${APP_DIR}/app.ini
 
+ENTRYPOINT ["uwsgi", "--ini", "/app/app.ini"]
