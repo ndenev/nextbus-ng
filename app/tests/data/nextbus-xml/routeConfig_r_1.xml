@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8" ?> 
+<body copyright="All data copyright San Francisco Muni 2016.">
+<route tag="1" title="1-California" color="cc6600" oppositeColor="000000" latMin="37.7797399" latMax="37.7954399" lonMin="-122.49335" lonMax="-122.39682">
+<stop tag="3892" title="California St &amp; Presidio Ave" lat="37.7872699" lon="-122.44696" stopId="13892"/>
+<direction tag="1____I_F00" title="Inbound to Drumm + Clay" name="Inbound" useForUI="true">
+  <stop tag="4277" />
+  <stop tag="3555" />
+</direction>
+<direction tag="1____O_F00" title="Outbound to Geary + 33rd Avenue" name="Outbound" useForUI="true">
+  <stop tag="4015" />
+  <stop tag="6294" />
+</direction>
+<path>
+<point lat="37.7797399" lon="-122.49311"/>
+<point lat="37.78154" lon="-122.49335"/>
+</path>
+<path>
+<point lat="37.78727" lon="-122.44696"/>
+<point lat="37.78692" lon="-122.44996"/>
+</path>
+</route>
+</body>

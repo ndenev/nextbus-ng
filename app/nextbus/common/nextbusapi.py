@@ -3,11 +3,9 @@ import requests
 from json import JSONEncoder
 from retry import retry
 
-from nextbus import app
 
 DEFAULT_AGENCY = 'sf-muni'
 DEFAULT_ENDPOINT = 'http://webservices.nextbus.com/service/publicXMLFeed'
-DEFAULT_CACHE_TTL = 300
 
 #
 # XML Api Specification
@@ -63,8 +61,16 @@ class NextbusObject(object):
             setattr(self.__class__, k,
                     property(lambda self: self._data.get(k, None)))
 
+    def __eq__(self, other):
+        return (isinstance(other, self.__class__)
+            and self.__dict__ == other.__dict__)
+
+    def __ne__(self, other):
+        return not self.__eq__(other)
+
     def __repr__(self):
-        return "{}({})".format(self.__class__.__name__, self.__dict__)
+        return "{}({})".format(self.__class__.__name__,
+                               ", ".join(["{}='{}'".format(k, v) for k, v in self._data.items()]))
 
 
 class NextbusAgency(NextbusObject):
@@ -73,16 +79,18 @@ class NextbusAgency(NextbusObject):
 
     def __init__(self, **params):
         super(NextbusAgency, self).__init__(**params)
-
-    @property
+        setattr(NextbusObject, 'shortTitle', property(lambda self: "XXX"))
+    '''
+    @NextbusObject.shortTitle.getter
     def shortTitle(self):
         """ Override the shortTitle getter.
         The short title might be missing in the API response,
         so in this case according to the documentation we can
         use the "title" attribute.
         """
-        return self.shortTitle if self.shortTitle else self.title
-
+        return "XXX"
+        #return self.shortTitle if self.shortTitle else self.title
+    '''
 
 class NextbusRoute(NextbusObject):
     """ Bus route class. """
@@ -91,6 +99,7 @@ class NextbusRoute(NextbusObject):
     def __init__(self, **params):
         super(NextbusRoute, self).__init__(**params)
 
+    '''
     @property
     def shortTitle(self):
         """ Override the shortTitle getter.
@@ -98,8 +107,9 @@ class NextbusRoute(NextbusObject):
         so in this case according to the documentation we can
         use the "title" attribute.
         """
-        return self.shortTitle if self.shortTitle else self.title
-
+        return "XXX"
+        #return self.shortTitle if self.shortTitle else self.title
+    '''
 
 class NextbusRouteConfig(NextbusObject):
     """ Bus route configuration object. """
@@ -151,17 +161,6 @@ class NextbusDirectionStop(NextbusObject):
         super(NextbusDirectionStop, self).__init__(**params)
 
 
-@app.cache.memoize(DEFAULT_CACHE_TTL)
-def _cached_request(endpoint, headers, timeout, params):
-    """ Wrapper function around request get so we can more
-    easily memoize it without having to deal with the class
-    instance.
-    """
-    r = requests.get(endpoint, headers=headers, timeout=timeout, params=params)
-    r.raise_for_status()
-    return ET.fromstring(r.text)
-
-
 class NextbusApiClient(object):
     def __init__(self, agency=DEFAULT_AGENCY, endpoint=DEFAULT_ENDPOINT):
         self.agency = agency
@@ -182,10 +181,10 @@ class NextbusApiClient(object):
         if set_agency:
             params.update({'a': self.agency})
         params.update({'command': command})
-        etree = _cached_request(self.endpoint,
-                                headers=self.headers,
-                                timeout=self.timeout,
-                                params=params)
+        req = requests.get(self.endpoint, headers=self.headers,
+                           timeout=self.timeout, params=params)
+        req.raise_for_status()
+        etree = ET.fromstring(req.text)
         self._check_error(etree)
         return etree
 
@@ -215,7 +214,7 @@ class NextbusApiClient(object):
             paths = []
             for path in rt.findall('path'):
                 points = [NextbusPoint(**e.attrib) for e in path.findall('point')]
-                paths.append([NextbusPath(points, **path.attrib)])
+                paths.append(NextbusPath(points, **path.attrib))
             routes.append(NextbusRouteConfig(stops, dirs, paths, **rt.attrib))
         return routes
 
