@@ -7,7 +7,6 @@ from nextbus.common.nextbusapi import NextbusApiClient, NextbusApiError
 class Agency(Resource):
     def get(self):
         api = NextbusApiClient()
-        #agencies = [a.serialize() for a in api.agency_list()]
         agencies = api.agency_list()
         if agencies:
             return {'agency': agencies}, 200
@@ -18,7 +17,6 @@ class Agency(Resource):
 class Routes(Resource):
     def get(self):
         api = NextbusApiClient()
-        #routes = [r.serialize() for r in api.route_list()]
         routes = api.route_list()
         if routes:
             return {'routes': routes}, 200
@@ -37,7 +35,6 @@ class RouteConfig(Resource):
         parser.add_argument('verbose', type=bool)
         args = parser.parse_args()
         api = NextbusApiClient()
-        #routes = _serialize(api.route_config(tag, verbose=args.get('verbose', False)))
         try:
             routes = api.route_config(tag, verbose=args.get('verbose', False))
             return {'routeconfig': routes}
