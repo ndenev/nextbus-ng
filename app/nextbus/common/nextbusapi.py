@@ -1,5 +1,6 @@
 import xml.etree.ElementTree as ET
 import requests
+from requests.exceptions import ConnectionError
 from json import JSONEncoder
 from retry import retry
 
@@ -176,7 +177,7 @@ class NextbusApiClient(object):
             else:
                 raise NextbusApiFatalError(err.text)
 
-    @retry(NextbusApiRetriableError, tries=3, delay=10)
+    @retry((ConnectionError, NextbusApiRetriableError), tries=3, delay=10)
     def _make_request(self, command, params={}, set_agency=True):
         if set_agency:
             params.update({'a': self.agency})

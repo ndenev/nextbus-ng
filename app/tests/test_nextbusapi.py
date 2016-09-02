@@ -1,9 +1,13 @@
 import pytest
-from mock import MagicMock
+from mock import Mock, MagicMock
 import sys, os
 import json
+import requests
 
-sys.path.insert(0, os.path.realpath(os.path.dirname(__file__)+"/.."))
+from flask import Flask
+from flask_cache import Cache
+from flask_restful import Api
+
 
 from nextbus.common.nextbusapi import NextbusApiClient, NextbusAgency, \
                                       NextbusRoute, NextbusRouteConfig, \
@@ -11,14 +15,30 @@ from nextbus.common.nextbusapi import NextbusApiClient, NextbusAgency, \
                                       NextbusPath, NextbusPoint, \
                                       NextbusDirectionStop
 
+from nextbus.resources import Agency, Routes, RouteSchedule, RouteConfig
+
+sys.path.insert(0, os.path.realpath(os.path.dirname(__file__)+"/.."))
+
 MOCK_DIR = os.path.join(os.path.realpath(os.path.dirname(__file__)),
                                          'data/nextbus-xml')
 MOCK_MAP = {'agencyList': 'agencyList.xml',
             'routeList': 'routeList.xml'}
 
 @pytest.fixture
+def mock_app(monkeypatch):
+    #from nextbus import app
+    from nextbus.router import setup_router
+    app = Flask(__name__)
+    app.api = Api(app)
+    app.cache = Cache(app, config={'CACHE_TYPE': 'simple'})
+    app.testing = True
+    setup_router(app)
+
+
+    return app
+
+@pytest.fixture
 def mock_get_request(monkeypatch):
-    import requests
 
     class MockResponse(object):
         def __init__(self, *args, **kwargs):
@@ -41,19 +61,11 @@ def mock_get_request(monkeypatch):
         return MockResponse(*args, **kwargs)
     monkeypatch.setattr(requests, 'get', mock_get)
 
-'''
-
-thing = requests
-thing.method = MagicMock(return_value=3)
-thing.method(3, 4, 5, key='value')
-
-thing.method.assert_called_with(3, 4, 5, key='value')
-'''
 
 def test_new_client():
     api = NextbusApiClient()
 
-def test_agency_list(mock_get_request):
+def test_agency_list(mock_get_request, mock_app):
     api = NextbusApiClient()
     expected = [NextbusAgency(tag='sf-muni',
                               title='San Francisco Muni',
@@ -66,9 +78,12 @@ def test_agency_list(mock_get_request):
     # XXX: assert expected[0].shortTitle != expected[0].title
     assert expected[1].shortTitle == expected[1].title
 
+    agency_rest = Agency()
+    expected_rest = ({'agency': expected}, 200)
+    with mock_app.test_request_context('/agency'):
+        assert agency_rest.get() == expected_rest
 
-
-def test_route_list(mock_get_request):
+def test_route_list(mock_get_request, mock_app):
     api = NextbusApiClient()
     expected = [NextbusRoute(tag='E', title='E-Embarcadero'),
                 NextbusRoute(tag='F', title='F-Market & Wharves'),
@@ -77,7 +92,12 @@ def test_route_list(mock_get_request):
                 NextbusRoute(tag='L', title='L-Taraval')]
     assert api.route_list() == expected
 
-def test_route_config(mock_get_request):
+    route_rest = Routes()
+    expected_rest = ({'routes': expected}, 200)
+    with mock_app.test_request_context('/route'):
+        assert route_rest.get() == expected_rest
+
+def test_route_config(mock_get_request, mock_app):
     api = NextbusApiClient()
     stops = [NextbusRouteStop(tag='3892',
                               title='California St & Presidio Ave',
@@ -103,6 +123,12 @@ def test_route_config(mock_get_request):
                                    latMax="37.7954399", lonMin="-122.49335",
                                    lonMax="-122.39682")]
     assert api.route_config(route_tag="1") == expected
+
+    routecfg_rest = RouteConfig()
+    expected_rest = ({'routeconfig': expected}, 200)
+
+    with mock_app.test_request_context('/route/config/1'):
+        assert routecfg_rest.get() == expected_rest
 
 def test_bad_object():
     with pytest.raises(ValueError):
