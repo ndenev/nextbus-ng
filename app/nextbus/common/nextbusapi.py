@@ -1,5 +1,7 @@
 import xml.etree.ElementTree as ET
 import requests
+from json import JSONEncoder
+from retry import retry
 
 from nextbus import app
 
@@ -37,7 +39,7 @@ class NextbusApiRetriableError(NextbusApiError):
     pass
 
 
-class NextbuApiFatalError(NextbusApiError):
+class NextbusApiFatalError(NextbusApiError):
     """ Fatal exception, no need to retry. """
     pass
 
@@ -53,7 +55,6 @@ class NextbusObject(object):
         Also build getters for all attributes.
         """
         self._data = {}
-        self._nested = {}
         for k, v in params.items():
             if k not in self._attributes:
                 raise ValueError("Unknown attribute {} for {}",
@@ -61,13 +62,6 @@ class NextbusObject(object):
             self._data[k] = v
             setattr(self.__class__, k,
                     property(lambda self: self._data.get(k, None)))
-
-    @property
-    def nested(self):
-        return self._nested
-
-    def serialize(self):
-        return self._data
 
     def __repr__(self):
         return "{}({})".format(self.__class__.__name__, self.__dict__)
@@ -117,9 +111,9 @@ class NextbusRouteConfig(NextbusObject):
 
     def __init__(self, stops, directions, paths, **params):
         super(NextbusRouteConfig, self).__init__(**params)
-        self._nested['stop'] = stops
-        self._nested['directions'] = directions
-        self._nested['path'] = paths
+        self._data['stop'] = stops
+        self._data['directions'] = directions
+        self._data['path'] = paths
 
 
 class NextbusRouteStop(NextbusObject):
@@ -134,13 +128,13 @@ class NextbusDirection(NextbusObject):
 
     def __init__(self, stops, **params):
         super(NextbusDirection, self).__init__(**params)
-        self._nested['stop'] = stops
+        self._data['stop'] = stops
 
 
 class NextbusPath(NextbusObject):
     def __init__(self, points, **params):
         super(NextbusPath, self).__init__(**params)
-        self._nested['point'] = points
+        self._data['point'] = points
 
 
 class NextbusPoint(NextbusObject):
@@ -175,14 +169,25 @@ class NextbusApiClient(object):
         self.headers = {'content-type': 'application/json'}
         self.timeout = 10
 
+    def _check_error(self, etree):
+        err = etree.find('Error')
+        if err is not None:
+            if err.get('shouldRetry', None) == "true":
+                raise NextbusApiRetriableError(err.text)
+            else:
+                raise NextbusApiFatalError(err.text)
+
+    @retry(NextbusApiRetriableError, tries=3, delay=10)
     def _make_request(self, command, params={}, set_agency=True):
         if set_agency:
             params.update({'a': self.agency})
         params.update({'command': command})
-        return _cached_request(self.endpoint,
-                               headers=self.headers,
-                               timeout=self.timeout,
-                               params=params)
+        etree = _cached_request(self.endpoint,
+                                headers=self.headers,
+                                timeout=self.timeout,
+                                params=params)
+        self._check_error(etree)
+        return etree
 
     def agency_list(self):
         et = self._make_request('agencyList', set_agency=False)
@@ -213,3 +218,8 @@ class NextbusApiClient(object):
                 paths.append([NextbusPath(points, **path.attrib)])
             routes.append(NextbusRouteConfig(stops, dirs, paths, **rt.attrib))
         return routes
+
+
+class NextbusObjectSerializer(JSONEncoder):
+    def default(self, o):
+        return o._data
