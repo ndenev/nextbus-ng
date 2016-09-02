@@ -1,4 +1,5 @@
 import pytest
+from mock import MagicMock
 import sys, os
 import json
 
@@ -10,7 +11,8 @@ from nextbus.common.nextbusapi import NextbusApiClient, NextbusAgency, \
                                       NextbusPath, NextbusPoint, \
                                       NextbusDirectionStop
 
-MOCK_DIR = 'tests/data/nextbus-xml'
+MOCK_DIR = os.path.join(os.path.realpath(os.path.dirname(__file__)),
+                                         'data/nextbus-xml')
 MOCK_MAP = {'agencyList': 'agencyList.xml',
             'routeList': 'routeList.xml'}
 
@@ -39,6 +41,14 @@ def mock_get_request(monkeypatch):
         return MockResponse(*args, **kwargs)
     monkeypatch.setattr(requests, 'get', mock_get)
 
+'''
+
+thing = requests
+thing.method = MagicMock(return_value=3)
+thing.method(3, 4, 5, key='value')
+
+thing.method.assert_called_with(3, 4, 5, key='value')
+'''
 
 def test_new_client():
     api = NextbusApiClient()
