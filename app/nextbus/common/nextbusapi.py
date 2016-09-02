@@ -1,6 +1,7 @@
-from nextbus import app
 import xml.etree.ElementTree as ET
 import requests
+
+from nextbus import app
 
 DEFAULT_AGENCY = 'sf-muni'
 DEFAULT_ENDPOINT = 'http://webservices.nextbus.com/service/publicXMLFeed'
@@ -40,22 +41,6 @@ class NextbuApiFatalError(NextbusApiError):
     """ Fatal exception, no need to retry. """
     pass
 
-
-'''
-def _serialize(obj):
-    if issubclass(obj.__class__, NextbusObject):
-        ret = {}
-        for k, v in obj._nested.items():
-                ret.update({k: _serialize(v)})
-        ret.update(obj.serialize())
-        return ret
-    elif issubclass(obj.__class__, list):
-        return [_serialize(i) for i in obj]
-    elif issubclass(obj.__class__, dict):
-        return obj
-    else:
-        raise ValueError("Invalid object class.")
-'''
 
 class NextbusObject(object):
     """ Base class for all Nextbus API objects/resources.

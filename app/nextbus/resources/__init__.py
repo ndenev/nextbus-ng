@@ -1,3 +1,1 @@
-from resources import *
-
-__all__ = ["NextBus", "NextBusCached"]
+from .resources import *

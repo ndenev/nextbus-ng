@@ -1,5 +1,4 @@
 from flask_restful import reqparse, Resource
-
 from nextbus.common.nextbusapi import NextbusObject, NextbusApiClient
 
 
@@ -33,6 +32,11 @@ def _serialize(o):
         return o
     elif issubclass(o.__class__, list):
         return [_serialize(i) for i in o]
+
+
+class RouteSchedule(Resource):
+    def get(self, tag=None):
+        api = NextbusApiClient()
 
 
 class RouteConfig(Resource):
