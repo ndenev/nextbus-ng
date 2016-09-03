@@ -21,7 +21,7 @@ class ApiStats(NextbusApiResource):
         names = [k._display_name for k in NextbusApiResource.__subclasses__()
                  if k._display_name]
         counts = app.stats_redis.mget(names)
-        return {k: v if v else 0 for k, v in zip(names, counts)}
+        return {'stats': {k: v if v else 0 for k, v in zip(names, counts)}}
 
 
 class Agency(NextbusApiResource):
