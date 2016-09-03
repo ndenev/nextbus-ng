@@ -1,9 +1,11 @@
+import logging
 import xml.etree.ElementTree as ET
 import requests
 from requests.exceptions import ConnectionError
 from json import JSONEncoder
 from retry import retry
 
+logger = logging.getLogger('nextbusapi')
 
 DEFAULT_AGENCY = 'sf-muni'
 DEFAULT_ENDPOINT = 'http://webservices.nextbus.com/service/publicXMLFeed'
@@ -12,20 +14,6 @@ DEFAULT_ENDPOINT = 'http://webservices.nextbus.com/service/publicXMLFeed'
 # XML Api Specification
 # http://www.nextbus.com/xmlFeedDocs/NextBusXMLFeed.pdf
 #
-
-'''
-Errors:
-
-    <body>
-    <Error shouldRetry="true">
-    Agency server cannot accept client while status is: agency
-    name = sf-muni,status = UNINITIALIZED, client count = 0, last
-    even t = 0 seconds ago Could not get route list for agency tag "sf-muni".
-    Either the route tag is bad or the system is initializing.
-    </Error>
-    </body>
-
-'''
 
 
 class NextbusApiError(Exception):
@@ -70,8 +58,13 @@ class NextbusObject(object):
         return not self.__eq__(other)
 
     def __repr__(self):
-        return "{}({})".format(self.__class__.__name__,
-                               ", ".join(["{}='{}'".format(k, v) for k, v in self._data.items()]))
+        class_name = self.__class__.__name__
+        attribs = ", ".join(["{}={}".format(k, repr(v))
+                            for k, v in self._data.items()])
+        return "{}({})".format(class_name, attribs)
+
+    def __str__(self):
+        return self.__repr__()
 
 
 class NextbusAgency(NextbusObject):
@@ -92,6 +85,7 @@ class NextbusAgency(NextbusObject):
         return "XXX"
         #return self.shortTitle if self.shortTitle else self.title
     '''
+
 
 class NextbusRoute(NextbusObject):
     """ Bus route class. """
@@ -166,7 +160,7 @@ class NextbusApiClient(object):
     def __init__(self, agency=DEFAULT_AGENCY, endpoint=DEFAULT_ENDPOINT):
         self.agency = agency
         self.endpoint = endpoint
-        self.headers = {'content-type': 'application/json'}
+        self.headers = {'Accept-Encoding': 'gzip, deflate'}
         self.timeout = 10
 
     def _check_error(self, etree):
@@ -182,6 +176,9 @@ class NextbusApiClient(object):
         if set_agency:
             params.update({'a': self.agency})
         params.update({'command': command})
+        logger.debug('GET {}?{} HEADERS: {}'.format(
+            self.endpoint, "&".join(["{}={}".format(k, v) for k, v in params.items()]),
+            self.headers))
         req = requests.get(self.endpoint, headers=self.headers,
                            timeout=self.timeout, params=params)
         req.raise_for_status()
@@ -197,7 +194,7 @@ class NextbusApiClient(object):
         et = self._make_request('routeList')
         return [NextbusRoute(**e.attrib) for e in et.findall('route')]
 
-    def route_config(self, route_tag=None, verbose=False):
+    def route_config(self, route_tag=None, verbose=False, terse=False):
         params = {}
         if route_tag is not None:
             params.update({'r': route_tag})

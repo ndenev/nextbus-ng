@@ -1,6 +1,6 @@
 import socket
 
 def sucket(*args, **kwargs):
-    raise Exception("No internet access during testing!")
+    raise Exception("No network access during testing!")
 
 socket.socket = sucket
