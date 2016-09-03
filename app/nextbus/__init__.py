@@ -20,6 +20,7 @@ app.stats_redis = Redis(host=REDIS_CONFIG['redis_host'],
                         password=REDIS_CONFIG['redis_pass'],
                         db=1)
 
+
 @app.before_first_request
 def setup_logging():
     logger = logging.getLogger()

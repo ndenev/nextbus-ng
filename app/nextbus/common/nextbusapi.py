@@ -5,6 +5,8 @@ from requests.exceptions import ConnectionError
 from json import JSONEncoder
 from retry import retry
 
+from nextbus import app
+
 logger = logging.getLogger('nextbusapi')
 
 DEFAULT_AGENCY = 'sf-muni'
@@ -156,6 +158,14 @@ class NextbusDirectionStop(NextbusObject):
         super(NextbusDirectionStop, self).__init__(**params)
 
 
+@app.cache.memoize(30)
+def _cached_request(endpoint, params, headers, timeout):
+    req = requests.get(endpoint, headers=headers,
+                       timeout=timeout, params=params)
+    req.raise_for_status()
+    return req
+
+
 class NextbusApiClient(object):
     def __init__(self, agency=DEFAULT_AGENCY, endpoint=DEFAULT_ENDPOINT):
         self.agency = agency
@@ -179,9 +189,12 @@ class NextbusApiClient(object):
         logger.debug('GET {}?{} HEADERS: {}'.format(
             self.endpoint, "&".join(["{}={}".format(k, v) for k, v in params.items()]),
             self.headers))
-        req = requests.get(self.endpoint, headers=self.headers,
-                           timeout=self.timeout, params=params)
-        req.raise_for_status()
+
+        req = _cached_request(self.endpoint,
+                              params,
+                              self.headers,
+                              self.timeout)
+
         etree = ET.fromstring(req.text)
         self._check_error(etree)
         return etree
