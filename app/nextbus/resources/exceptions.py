@@ -1,6 +1,7 @@
 
 class NextbusNgBaseException(Exception):
-    pass
+    def __init__(self):
+        pass
 
 class InvalidRouteTagFormat(NextbusNgBaseException):
     pass

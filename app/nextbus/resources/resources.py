@@ -1,20 +1,27 @@
-from flask_restful import reqparse, Resource, marshal
-
+from flask_restful import reqparse, Resource
+from flask import g, request
+import time
 from nextbus import app
-from nextbus.common.nextbusapi import NextbusApiClient, NextbusApiError
+from nextbus.common.nextbusapi import NextbusApiError
 
-CACHE_TTL=3600
+CACHE_TTL = 3600
+
+
+@app.teardown_request
+def teardown_request(exception=None):
+    app.logger.info("request {} time: {}".format(request.url_rule, time.time() - g.start))
 
 
 class NextbusApiResource(Resource):
     _display_name = None
 
     def counter(self):
+        g.start = time.time()
         app.stats_redis.incr(self._display_name)
 
 
 class ApiStats(NextbusApiResource):
-    _display_name = "api_stats"
+    _display_name = "stats"
 
     def get(self):
         self.counter()
@@ -24,13 +31,23 @@ class ApiStats(NextbusApiResource):
         return {'stats': {k: v if v else 0 for k, v in zip(names, counts)}}
 
 
+class ApiRoot(NextbusApiResource):
+    _display_name = None
+
+    def get(self):
+        self.counter()
+        names = [k._display_name for k in NextbusApiResource.__subclasses__()
+                 if k._display_name]
+        return {'resources': names}
+
+
 class Agency(NextbusApiResource):
-    _stat_name = "agency_list"
+    _stat_name = "agency"
 
     def get(self):
         self.counter()
         app.logger.debug("getting agency list")
-        agencies = NextbusApiClient().agency_list()
+        agencies = app.nextbus_api.agency_list()
         if agencies:
             return {'agency': agencies}, 200
         else:
@@ -38,11 +55,11 @@ class Agency(NextbusApiResource):
 
 
 class Routes(NextbusApiResource):
-    _display_name = "route_list"
+    _display_name = "routes"
 
     def get(self):
         self.counter()
-        routes = NextbusApiClient().route_list()
+        routes = app.nextbus_api.route_list()
         if routes:
             return {'routes': routes}, 200
         else:
@@ -50,15 +67,19 @@ class Routes(NextbusApiResource):
 
 
 class RouteSchedule(NextbusApiResource):
-    _display_name = "route_schedule"
+    _display_name = "routes/schedule"
 
     def get(self, tag=None):
         self.counter()
-        return {'error': "not implemented"}
+        try:
+            schedule = app.nextbus_api.route_schedule(tag)
+            return {'schedule': schedule}, 200
+        except NextbusApiError as e:
+            return {'error': e.message}, 404
 
 
 class StopPredictions(NextbusApiResource):
-    _display_name = "stop_predictions"
+    _display_name = "stop/predictions"
 
     def get(self):
         self.counter()
@@ -66,7 +87,7 @@ class StopPredictions(NextbusApiResource):
 
 
 class RouteConfig(NextbusApiResource):
-    _display_name = "route_config"
+    _display_name = "routes/config"
 
     def get(self, tag=None):
         self.counter()
@@ -76,9 +97,7 @@ class RouteConfig(NextbusApiResource):
         app.logger.debug("ARGS: {}".format(args))
         try:
             app.logger.info("getting route_config list and memoizing")
-            routes = NextbusApiClient().route_config(tag, args.verbose)
+            routes = app.nextbus_api.route_config(tag, args.verbose)
             return {'routeconfig': routes}, 200
         except NextbusApiError as e:
-            return {'error': 'no routes found{}'.format(
-                    ' for tag {}'.format(tag) if tag else ''),
-                    'message': e.message}, 404
+            return {'error': e.message}, 404

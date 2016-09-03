@@ -11,6 +11,7 @@ logger = logging.getLogger('nextbusapi')
 
 DEFAULT_AGENCY = 'sf-muni'
 DEFAULT_ENDPOINT = 'http://webservices.nextbus.com/service/publicXMLFeed'
+CACHE_TTL = 3600
 
 #
 # XML Api Specification
@@ -158,7 +159,47 @@ class NextbusDirectionStop(NextbusObject):
         super(NextbusDirectionStop, self).__init__(**params)
 
 
-@app.cache.memoize(30)
+class NextbusRouteSchedule(NextbusObject):
+    _attributes = ['tag', 'title', 'scheduleClass',
+                   'serviceClass', 'direction']
+
+    def __init__(self, header, blocks, **params):
+        super(NextbusRouteSchedule, self).__init__(**params)
+        self._data['header'] = header
+        self._data['block'] = blocks
+
+
+class NextbusRouteScheduleHeader(NextbusObject):
+    def __init__(self, stops, **params):
+        super(NextbusRouteScheduleHeader, self).__init__(**params)
+        self._data['stop'] = stops
+
+
+class NextbusRouteScheduleHeaderEntry(NextbusObject):
+    _attributes = ['tag']
+
+    def __init__(self, text, **params):
+        super(NextbusRouteScheduleHeaderEntry, self).__init__(**params)
+        self._data['title'] = text
+
+
+class NextbusRouteScheduleBlock(NextbusObject):
+    _attributes = ['blockID']
+
+    def __init__(self, stopdata, **params):
+        super(NextbusRouteScheduleBlock, self).__init__(**params)
+        self._data['stop_prediction'] = stopdata
+
+
+class NextbusRouteSchedulePrediction(NextbusObject):
+    _attributes = ['tag', 'epochTime']
+
+    def __init__(self, text_time, **params):
+        super(NextbusRouteSchedulePrediction, self).__init__(**params)
+        self._data['time'] = text_time
+
+
+@app.cache.memoize(CACHE_TTL)
 def _cached_request(endpoint, params, headers, timeout):
     req = requests.get(endpoint, headers=headers,
                        timeout=timeout, params=params)
@@ -187,8 +228,8 @@ class NextbusApiClient(object):
             params.update({'a': self.agency})
         params.update({'command': command})
         logger.debug('GET {}?{} HEADERS: {}'.format(
-            self.endpoint, "&".join(["{}={}".format(k, v) for k, v in params.items()]),
-            self.headers))
+            self.endpoint, "&".join(["{}={}".format(k, v) for k, v
+                                     in params.items()]), self.headers))
 
         req = _cached_request(self.endpoint,
                               params,
@@ -220,13 +261,39 @@ class NextbusApiClient(object):
             stops = [NextbusRouteStop(**e.attrib) for e in rt.findall('stop')]
             dirs = []
             for direc in rt.findall('direction'):
-                dirstp = [NextbusDirectionStop(**e.attrib) for e in direc.findall('stop')]
+                dirstp = [NextbusDirectionStop(**e.attrib) for e
+                          in direc.findall('stop')]
                 dirs.append(NextbusDirection(dirstp, **direc.attrib))
             paths = []
             for path in rt.findall('path'):
-                points = [NextbusPoint(**e.attrib) for e in path.findall('point')]
+                points = [NextbusPoint(**e.attrib) for e
+                          in path.findall('point')]
                 paths.append(NextbusPath(points, **path.attrib))
-            routes.append(NextbusRouteConfig(stops, dirs, paths, **rt.attrib))
+            routes.append(NextbusRouteConfig(stops,
+                                             dirs,
+                                             paths,
+                                             **rt.attrib))
+        return routes
+
+    def route_schedule(self, route_tag=None):
+        params = {}
+        if route_tag is not None:
+            params.update({'r': route_tag})
+
+        et = self._make_request('schedule', params=params)
+
+        routes = []
+        for rt in et.findall('route'):
+            header = rt.find('header')
+            hstops = [NextbusRouteScheduleHeaderEntry(e.text, **e.attrib) for e
+                      in header.findall('stop')]
+            blocks = []
+            for block in rt.findall('tr'):
+                stopdata = [NextbusRouteSchedulePrediction(e.text, **e.attrib)
+                            for e in block.findall('stop')]
+                blocks.append(NextbusRouteScheduleBlock(stopdata,
+                                                        **block.attrib))
+            routes.append(NextbusRouteSchedule(hstops, blocks, **rt.attrib))
         return routes
 
 
