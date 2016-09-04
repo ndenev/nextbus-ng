@@ -1,30 +1,37 @@
 from flask_restful import reqparse, Resource
 from flask import g, request
 from socket import gethostname
+import json
 import time
 from nextbus import app
 from nextbus.common.nextbusapi import NextbusApiError
 
-CACHE_TTL = 3600
-SLOW_THRESH = 1.0
+CACHE_TTL = 30
+SLOW_THRESH = 5.0
 SLOW_LOG_SIZE = 5
 
 
 @app.teardown_request
 def teardown_request(exception=None):
+    """ We are logging slow queries here. """
     request_time = time.time() - g.start
     if request_time > SLOW_THRESH:
         app.logger.info("logging slow request {} time: {}".format(
                                                           request.url_rule,
                                                           request_time))
         app.stats_redis.zadd('slowlog',
-                             {'time': request_time,
-                              'request': request,
-                              'host': str(gethostname())},
+                             json.dumps({'time': time.time(),
+                                         'path': request.path,
+                                         'method': request.method,
+                                         'args': request.args.to_dict(),
+                                         'remote_host': request.remote_addr,
+                                         'api_host': gethostname()}),
                              request_time)
+
         r = app.stats_redis.zremrangebyrank('slowlog', 0, -(SLOW_LOG_SIZE + 1))
-        if r:
-            app.logger.info("purging {} slowlog entries", r)
+
+        if r > 0:
+            app.logger.info("trimming off {} slowlog entries".format(r))
 
 
 class NextbusApiResource(Resource):
@@ -52,8 +59,12 @@ class ApiSlowLog(NextbusApiResource):
     def get(self):
         self.counter()
         slowlog = []
-        for r, t in app.stats_redis.zrevrange('slowlog', 0, 4, withscores=True):
-            slowlog.append({'request': r, 'time': t})
+        for rj, rt in app.stats_redis.zrevrange('slowlog', 0,
+                                                SLOW_LOG_SIZE - 1,
+                                                withscores=True):
+            rd = json.loads(rj)
+            rd.update({'request_time': rt})
+            slowlog.append(rd)
         return {'slowlog': slowlog}
 
 
