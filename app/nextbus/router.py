@@ -1,6 +1,5 @@
 import re
 
-from flask import current_app
 from werkzeug.routing import BaseConverter
 from nextbus.resources import Agency, Routes, RouteConfig, \
                               RouteSchedule, StopPredictions, \

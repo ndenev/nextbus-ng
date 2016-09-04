@@ -19,6 +19,12 @@ CACHE_TTL = 3600
 #
 
 
+CMD_AGENCY_LIST = 'agencyList'
+CMD_ROUTE_LIST = 'routeList'
+CMD_ROUTE_CONFIG = 'routeConfig'
+CMD_ROUTE_SCHEDULE = 'schedule'
+
+
 class NextbusApiError(Exception):
     """ NextbusApi Client base exception class """
     pass
@@ -121,6 +127,19 @@ class NextbusRoute(NextbusObject):
         #return self.shortTitle if self.shortTitle else self.title
     '''
 
+
+class NextbusRouteConfigList(NextbusObject):
+
+    def __init__(self, routes=[], **params):
+        super(NextbusRouteConfigList, self).__init__(**params)
+        self._data['routes'] = routes
+
+    @staticmethod
+    def from_etree(etree):
+        return [NextbusRouteConfig.from_etree(e)
+                for e in etree.findall('route')]
+
+
 class NextbusRouteConfig(NextbusObject):
     """ Bus route configuration object. """
     """ useForUI """
@@ -129,7 +148,7 @@ class NextbusRouteConfig(NextbusObject):
                    'direction', 'useForUI', 'latMax', 'latMin',
                    'lonMax', 'lonMin']
 
-    def __init__(self, stops, directions, paths, **params):
+    def __init__(self, stops=[], directions=[], paths=[], **params):
         super(NextbusRouteConfig, self).__init__(**params)
         self._data['stop'] = stops
         self._data['directions'] = directions
@@ -137,24 +156,19 @@ class NextbusRouteConfig(NextbusObject):
 
     @staticmethod
     def from_etree(etree):
-        routes = []
-        for rt in etree.findall('route'):
-            stops = [NextbusRouteStop(**e.attrib) for e in rt.findall('stop')]
-            dirs = []
-            for direc in rt.findall('direction'):
-                dirstp = [NextbusDirectionStop(**e.attrib) for e
-                          in direc.findall('stop')]
-                dirs.append(NextbusDirection(dirstp, **direc.attrib))
-            paths = []
-            for path in rt.findall('path'):
-                points = [NextbusPoint(**e.attrib) for e
-                          in path.findall('point')]
-                paths.append(NextbusPath(points, **path.attrib))
-            routes.append(NextbusRouteConfig(stops,
-                                             dirs,
-                                             paths,
-                                             **rt.attrib))
-        return routes
+        stops = [NextbusRouteStop(**e.attrib) for e in etree.findall('stop')]
+        dirs = []
+        for direc in etree.findall('direction'):
+            dirstp = [NextbusDirectionStop(**e.attrib) for e
+                      in direc.findall('stop')]
+            dirs.append(NextbusDirection(dirstp, **direc.attrib))
+        paths = []
+        for path in etree.findall('path'):
+            points = [NextbusPoint(**e.attrib) for e
+                      in path.findall('point')]
+            paths.append(NextbusPath(points, **path.attrib))
+        return NextbusRouteConfig(stops, dirs, paths, **etree.attrib)
+
 
 class NextbusRouteStop(NextbusObject):
     _attributes = ['tag', 'title', 'shortTitle', 'lat', 'lon', 'stopId']
@@ -216,6 +230,7 @@ class NextbusRouteSchedule(NextbusObject):
             routes.append(NextbusRouteSchedule(hstops, blocks, **rt.attrib))
         return routes
 
+
 class NextbusRouteScheduleHeader(NextbusObject):
     def __init__(self, stops, **params):
         super(NextbusRouteScheduleHeader, self).__init__(**params)
@@ -228,7 +243,6 @@ class NextbusRouteScheduleHeaderEntry(NextbusObject):
     def __init__(self, text, **params):
         super(NextbusRouteScheduleHeaderEntry, self).__init__(**params)
         self._data['title'] = text
-
 
 
 class NextbusRouteScheduleBlock(NextbusObject):
@@ -274,11 +288,8 @@ class NextbusApiClient(object):
     @retry((ConnectionError, NextbusApiRetriableError), tries=3, delay=10)
     def _make_request(self, command, params={}, set_agency=True):
         if set_agency:
-            params.update({'a': self.agency})
-        params.update({'command': command})
-        logger.debug('GET {}?{} HEADERS: {}'.format(
-            self.endpoint, "&".join(["{}={}".format(k, v) for k, v
-                                     in params.items()]), self.headers))
+            params['a'] = self.agency
+        params['command'] = command
 
         req = _cached_request(self.endpoint, params,
                               self.headers, self.timeout)
@@ -288,11 +299,11 @@ class NextbusApiClient(object):
         return etree
 
     def agency_list(self):
-        etree = self._make_request('agencyList', set_agency=False)
+        etree = self._make_request(CMD_AGENCY_LIST, set_agency=False)
         return NextbusAgencyList.from_etree(etree)
 
     def route_list(self):
-        etree = self._make_request('routeList')
+        etree = self._make_request(CMD_ROUTE_LIST)
         return NextbusRouteList.from_etree(etree)
 
     def route_config(self, route_tag=None, verbose=False, terse=False):
@@ -301,33 +312,15 @@ class NextbusApiClient(object):
             params.update({'r': route_tag})
         if verbose is not False:
             params.update({'verbose': True})
-        etree = self._make_request('routeConfig', params=params)
-
-        routes = []
-        for rt in etree.findall('route'):
-            stops = [NextbusRouteStop(**e.attrib) for e in rt.findall('stop')]
-            dirs = []
-            for direc in rt.findall('direction'):
-                dirstp = [NextbusDirectionStop(**e.attrib) for e
-                          in direc.findall('stop')]
-                dirs.append(NextbusDirection(dirstp, **direc.attrib))
-            paths = []
-            for path in rt.findall('path'):
-                points = [NextbusPoint(**e.attrib) for e
-                          in path.findall('point')]
-                paths.append(NextbusPath(points, **path.attrib))
-            routes.append(NextbusRouteConfig(stops,
-                                             dirs,
-                                             paths,
-                                             **rt.attrib))
-        return routes
+        etree = self._make_request(CMD_ROUTE_CONFIG, params=params)
+        return NextbusRouteConfigList.from_etree(etree)
 
     def route_schedule(self, route_tag=None):
         params = {}
         if route_tag is not None:
             params.update({'r': route_tag})
 
-        etree = self._make_request('schedule', params=params)
+        etree = self._make_request(CMD_ROUTE_SCHEDULE, params=params)
         return NextbusRouteSchedule.from_etree(etree)
 
 

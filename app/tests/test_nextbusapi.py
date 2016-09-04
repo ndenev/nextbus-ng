@@ -4,13 +4,13 @@ from mockredis import mock_redis_client
 import sys, os
 import json
 import requests
-
+import time
 import redis
 from flask import Flask
 from flask_cache import Cache
 from flask_restful import Api
 
-
+from nextbus.errors import api_error_map
 from nextbus.common.nextbusapi import NextbusApiClient, NextbusAgency, \
                                       NextbusRoute, NextbusRouteConfig, \
                                       NextbusRouteStop, NextbusDirection, \
@@ -29,21 +29,17 @@ MOCK_MAP = {'agencyList': 'agencyList.xml',
 
 @pytest.fixture
 def mock_app(monkeypatch):
-    from nextbus import app
+    mock_app = Flask(__name__)
+    mock_app.nextbus_api = NextbusApiClient()
+    mock_app.api = Api(mock_app, errors=api_error_map)
+    mock_app.cache = Cache(mock_app, config={'CACHE_TYPE': 'simple'})
+    mock_app.testing = True
+    mock_app.debug = True
+    mock_app.stats_redis = mock_redis_client()
     from nextbus.router import setup_router
-    #app = Flask(__name__)
-    app.nextbus_api = NextbusApiClient()
-    app.api = Api(app)
-    app.cache = Cache(app, config={'CACHE_TYPE': 'simple'})
-    app.testing = True
-    setup_router(app)
-    return app
+    setup_router(mock_app)
+    return mock_app
 
-'''
-@pytest.fixture()
-def mock_redis(monkeypatch):
-    monkeypatch.setattr(redis, 'Redis', mock_redis_client)
-'''
 
 @pytest.fixture
 def mock_get_request(monkeypatch):
@@ -94,7 +90,7 @@ def test_agency_list(mock_get_request, mock_app):
 
 
 def test_route_list(mock_get_request, mock_app):
-    api = NextbusApiClient()
+
     expected = [NextbusRoute(tag='E', title='E-Embarcadero'),
                 NextbusRoute(tag='F', title='F-Market & Wharves'),
                 NextbusRoute(tag='J', title='J-Church'),
@@ -102,6 +98,7 @@ def test_route_list(mock_get_request, mock_app):
                 NextbusRoute(tag='L', title='L-Taraval')]
 
     with mock_app.test_request_context('/routes'):
+        api = NextbusApiClient()
         assert api.route_list() == expected
         route_rest = Routes()
         expected_rest = ({'routes': expected}, 200)
@@ -109,7 +106,7 @@ def test_route_list(mock_get_request, mock_app):
 
 
 def test_route_config(mock_get_request, mock_app):
-    api = NextbusApiClient()
+
     stops = [NextbusRouteStop(tag='3892',
                               title='California St & Presidio Ave',
                               lat='37.7872699',
@@ -117,13 +114,16 @@ def test_route_config(mock_get_request, mock_app):
                               stopId='13892')]
     directions = [NextbusDirection([NextbusDirectionStop(tag='4277'),
                                     NextbusDirectionStop(tag='3555')],
-                                   tag='1____I_F00', title='Inbound to Drumm + Clay',
-                                   name='Inbound', useForUI='true'),
+                                   tag='1____I_F00',
+                                   title='Inbound to Drumm + Clay',
+                                   name='Inbound',
+                                   useForUI='true'),
                   NextbusDirection([NextbusDirectionStop(tag='4015'),
                                     NextbusDirectionStop(tag='6294')],
                                    tag='1____O_F00',
                                    title='Outbound to Geary + 33rd Avenue',
-                                   name='Outbound', useForUI='true')]
+                                   name='Outbound',
+                                   useForUI='true')]
     paths = [NextbusPath([NextbusPoint(lat='37.7797399', lon='-122.49311'),
                           NextbusPoint(lat='37.78154', lon='-122.49335')]),
              NextbusPath([NextbusPoint(lat='37.78727', lon='-122.44696'),
@@ -133,10 +133,13 @@ def test_route_config(mock_get_request, mock_app):
                                    oppositeColor="000000", latMin="37.7797399",
                                    latMax="37.7954399", lonMin="-122.49335",
                                    lonMax="-122.39682")]
-    with mock_app.test_request_context('/routes/config/1'):
+
+    with mock_app.test_request_context('/routes/config/1') as ctx:
+        api = NextbusApiClient()
+        ctx.start = time.time()
         assert api.route_config(route_tag="1") == expected
-        routecfg_rest = RouteConfig()
-        expected_rest = ({'routeconfig': expected}, 200)
+        #routecfg_rest = RouteConfig()
+        #expected_rest = ({'routeconfig': expected}, 200)
         #assert routecfg_rest.get() == expected_rest
 
 

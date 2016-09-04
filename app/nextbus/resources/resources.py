@@ -7,20 +7,25 @@ from nextbus.common.nextbusapi import NextbusApiError
 
 CACHE_TTL = 3600
 SLOW_THRESH = 1.0
+SLOW_LOG_SIZE = 5
+
 
 @app.teardown_request
 def teardown_request(exception=None):
-    print request.__dict__
     request_time = time.time() - g.start
     if request_time > SLOW_THRESH:
-        app.logger.info("slow request {} time: {}".format(request.url_rule,
+        app.logger.info("logging slow request {} time: {}".format(
+                                                          request.url_rule,
                                                           request_time))
         app.stats_redis.zadd('slowlog',
                              {'time': request_time,
                               'request': request,
                               'host': str(gethostname())},
                              request_time)
-        app.stats_redis.zremrangebyrank('slowlog', -1, -5)
+        r = app.stats_redis.zremrangebyrank('slowlog', 0, -(SLOW_LOG_SIZE + 1))
+        if r:
+            app.logger.info("purging {} slowlog entries", r)
+
 
 class NextbusApiResource(Resource):
     _display_name = None
@@ -40,18 +45,16 @@ class ApiStats(NextbusApiResource):
         counts = app.stats_redis.mget(names)
         return {'stats': {k: v if v else 0 for k, v in zip(names, counts)}}
 
+
 class ApiSlowLog(NextbusApiResource):
     _display_name = "stats/slowlog"
 
     def get(self):
         self.counter()
         slowlog = []
-        for r, t in app.stats_redis.zrevrangebyscore('slowlog',
-                                                     100,
-                                                     0,
-                                                     withscores=True):
+        for r, t in app.stats_redis.zrevrange('slowlog', 0, 4, withscores=True):
             slowlog.append({'request': r, 'time': t})
-        return {'slowlog': slowlog }
+        return {'slowlog': slowlog}
 
 
 class ApiRoot(NextbusApiResource):

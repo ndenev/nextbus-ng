@@ -39,8 +39,7 @@ def instantiate_nextbus_api_client():
 
 
 app.cache = Cache(app, config=APP_CONFIG['flask_cache_config'])
-app.api = Api(app, default_mediatype='application/json',
-              errors=api_error_map)
+app.api = Api(app, errors=api_error_map)
 app.stats_redis = Redis(host=REDIS_CONFIG['redis_host'],
                         port=REDIS_CONFIG['redis_port'],
                         password=REDIS_CONFIG['redis_pass'],
