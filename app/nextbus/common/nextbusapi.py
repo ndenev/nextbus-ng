@@ -77,9 +77,20 @@ class NextbusObject(object):
 
 
 class NextbusAgencyList(NextbusObject):
-    @staticmethod
-    def from_etree(etree):
-        return [NextbusAgency(**e.attrib) for e in etree.findall('agency')]
+    _attributes = ['agency']
+
+    def __init__(self, agency_list=[]):
+        super(NextbusAgencyList, self).__init__(agency=agency_list)
+
+    def add_agency(self, agency):
+        self._data['agency'].append(agency)
+
+    @classmethod
+    def from_etree(cls, etree):
+        agency_list_obj = cls()
+        for agency in etree.findall('agency'):
+            agency_list_obj.add_agency(NextbusAgency.from_etree(agency))
+        return agency_list_obj
 
 
 class NextbusAgency(NextbusObject):
@@ -89,20 +100,26 @@ class NextbusAgency(NextbusObject):
     def __init__(self, **params):
         super(NextbusAgency, self).__init__(**params)
 
-    '''
-    @NextbusObject.shortTitle.getter
-    def shortTitle(self):
-        """ Override the shortTitle getter.
-        The short title might be missing in th  e API response,
-        so in this case according to the documentation we can
-        use the "title" attribute.
-        """
-        return "XXX"
-        #return self.shortTitle if self.shortTitle else self.title
-    '''
+    @classmethod
+    def from_etree(cls, etree):
+        return cls(tag=etree.get('tag'),
+                   title=etree.get('tag'),
+                   shortTitle=etree.get('shortTitle',
+                                        etree.get('title')),
+                   regionTitle=etree.get('regionTitle'))
 
 
 class NextbusRouteList(NextbusObject):
+    _attributes = ['routes']
+
+    def __init__(self, route_list=[]):
+        super(NextbusRouteList, self).__init__(routes=route_list)
+
+    def add_route(self, route):
+        if not isinstance(route, NextbusRoute):
+            raise ValueError("Expected NextbusRoute object.")
+        self._data['routes'].append(route)
+
     @staticmethod
     def from_etree(etree):
         return [NextbusRoute(**e.attrib) for e in etree.findall('route')]
@@ -214,8 +231,8 @@ class NextbusRouteSchedule(NextbusObject):
         self._data['header'] = header
         self._data['block'] = blocks
 
-    @staticmethod
-    def from_etree(etree):
+    @classmethod
+    def from_etree(cls, etree):
         routes = []
         for rt in etree.findall('route'):
             header = rt.find('header')
@@ -261,14 +278,6 @@ class NextbusRouteSchedulePrediction(NextbusObject):
         self._data['time'] = text_time
 
 
-@app.cache.memoize(CACHE_TTL)
-def _cached_request(endpoint, params, headers, timeout):
-    req = requests.get(endpoint, headers=headers,
-                       timeout=timeout, params=params)
-    req.raise_for_status()
-    return req
-
-
 class NextbusApiClient(object):
     def __init__(self, agency=DEFAULT_AGENCY, endpoint=DEFAULT_ENDPOINT):
         self.agency = agency
@@ -291,6 +300,16 @@ class NextbusApiClient(object):
             params['a'] = self.agency
         params['command'] = command
 
+        @current_app.cache.memoize(CACHE_TTL)
+        def _cached_request(endpoint, params, headers, timeout):
+            current_app.logger.info("Making HTTP request to NextbusXMLFeed: "
+                                    " {} with params {}".format(endpoint,
+                                                                params))
+            req = requests.get(endpoint, headers=headers,
+                               timeout=timeout, params=params)
+            req.raise_for_status()
+            return req
+
         req = _cached_request(self.endpoint, params,
                               self.headers, self.timeout)
 
@@ -309,9 +328,11 @@ class NextbusApiClient(object):
     def route_config(self, route_tag=None, verbose=False, terse=False):
         params = {}
         if route_tag is not None:
-            params.update({'r': route_tag})
+            params['r'] = route_tag
         if verbose is not False:
-            params.update({'verbose': True})
+            params['verbose'] = True
+        if terse is not False:
+            params['terse'] = True
         etree = self._make_request(CMD_ROUTE_CONFIG, params=params)
         return NextbusRouteConfigList.from_etree(etree)
 
