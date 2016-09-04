@@ -14,9 +14,9 @@ COPY . /app/
 WORKDIR ${APP_DIR}
 RUN find . -name '*.pyc' -delete && \
     pip install -r requirements.txt && \
-    pip install pytest pytest-coverage mock && \
+    pip install pytest pytest-coverage mock mockredispy && \
     pytest -vvv --cov=nextbus && \
-    pip uninstall -y pytest-coverage pytest mock
+    pip uninstall -y pytest-coverage pytest mock mockredispy
 
 USER "nobody"
 

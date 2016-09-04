@@ -70,13 +70,19 @@ class NextbusObject(object):
         return self.__repr__()
 
 
+class NextbusAgencyList(NextbusObject):
+    @staticmethod
+    def from_etree(etree):
+        return [NextbusAgency(**e.attrib) for e in etree.findall('agency')]
+
+
 class NextbusAgency(NextbusObject):
     """ Agency class """
     _attributes = ['tag', 'title', 'shortTitle', 'regionTitle']
 
     def __init__(self, **params):
         super(NextbusAgency, self).__init__(**params)
-        setattr(NextbusObject, 'shortTitle', property(lambda self: "XXX"))
+
     '''
     @NextbusObject.shortTitle.getter
     def shortTitle(self):
@@ -88,6 +94,12 @@ class NextbusAgency(NextbusObject):
         return "XXX"
         #return self.shortTitle if self.shortTitle else self.title
     '''
+
+
+class NextbusRouteList(NextbusObject):
+    @staticmethod
+    def from_etree(etree):
+        return [NextbusRoute(**e.attrib) for e in etree.findall('route')]
 
 
 class NextbusRoute(NextbusObject):
@@ -123,6 +135,26 @@ class NextbusRouteConfig(NextbusObject):
         self._data['directions'] = directions
         self._data['path'] = paths
 
+    @staticmethod
+    def from_etree(etree):
+        routes = []
+        for rt in etree.findall('route'):
+            stops = [NextbusRouteStop(**e.attrib) for e in rt.findall('stop')]
+            dirs = []
+            for direc in rt.findall('direction'):
+                dirstp = [NextbusDirectionStop(**e.attrib) for e
+                          in direc.findall('stop')]
+                dirs.append(NextbusDirection(dirstp, **direc.attrib))
+            paths = []
+            for path in rt.findall('path'):
+                points = [NextbusPoint(**e.attrib) for e
+                          in path.findall('point')]
+                paths.append(NextbusPath(points, **path.attrib))
+            routes.append(NextbusRouteConfig(stops,
+                                             dirs,
+                                             paths,
+                                             **rt.attrib))
+        return routes
 
 class NextbusRouteStop(NextbusObject):
     _attributes = ['tag', 'title', 'shortTitle', 'lat', 'lon', 'stopId']
@@ -183,6 +215,7 @@ class NextbusRouteScheduleHeaderEntry(NextbusObject):
         self._data['title'] = text
 
 
+
 class NextbusRouteScheduleBlock(NextbusObject):
     _attributes = ['blockID']
 
@@ -214,13 +247,14 @@ class NextbusApiClient(object):
         self.headers = {'Accept-Encoding': 'gzip, deflate'}
         self.timeout = 10
 
-    def _check_error(self, etree):
+    def _parse_xml(self, text):
+        etree = ET.fromstring(text)
         err = etree.find('Error')
-        if err is not None:
-            if err.get('shouldRetry', None) == "true":
-                raise NextbusApiRetriableError(err.text)
-            else:
-                raise NextbusApiFatalError(err.text)
+        if err is None:
+            return etree
+        if err.get('shouldRetry') == "true":
+            raise NextbusApiRetriableError(err.text)
+        raise NextbusApiFatalError(err.text)
 
     @retry((ConnectionError, NextbusApiRetriableError), tries=3, delay=10)
     def _make_request(self, command, params={}, set_agency=True):
@@ -231,22 +265,20 @@ class NextbusApiClient(object):
             self.endpoint, "&".join(["{}={}".format(k, v) for k, v
                                      in params.items()]), self.headers))
 
-        req = _cached_request(self.endpoint,
-                              params,
-                              self.headers,
-                              self.timeout)
+        req = _cached_request(self.endpoint, params,
+                              self.headers, self.timeout)
 
-        etree = ET.fromstring(req.text)
-        self._check_error(etree)
+        etree = self._parse_xml(req.text)
+
         return etree
 
     def agency_list(self):
-        et = self._make_request('agencyList', set_agency=False)
-        return [NextbusAgency(**e.attrib) for e in et.findall('agency')]
+        etree = self._make_request('agencyList', set_agency=False)
+        return NextbusAgencyList.from_etree(etree)
 
     def route_list(self):
-        et = self._make_request('routeList')
-        return [NextbusRoute(**e.attrib) for e in et.findall('route')]
+        etree = self._make_request('routeList')
+        return NextbusRouteList.from_etree(etree)
 
     def route_config(self, route_tag=None, verbose=False, terse=False):
         params = {}
@@ -254,10 +286,10 @@ class NextbusApiClient(object):
             params.update({'r': route_tag})
         if verbose is not False:
             params.update({'verbose': True})
-        et = self._make_request('routeConfig', params=params)
+        etree = self._make_request('routeConfig', params=params)
 
         routes = []
-        for rt in et.findall('route'):
+        for rt in etree.findall('route'):
             stops = [NextbusRouteStop(**e.attrib) for e in rt.findall('stop')]
             dirs = []
             for direc in rt.findall('direction'):
@@ -280,10 +312,10 @@ class NextbusApiClient(object):
         if route_tag is not None:
             params.update({'r': route_tag})
 
-        et = self._make_request('schedule', params=params)
-
+        etree = self._make_request('schedule', params=params)
+        return NextbusRouteSchedule.from_etree(etree)
         routes = []
-        for rt in et.findall('route'):
+        for rt in etree.findall('route'):
             header = rt.find('header')
             hstops = [NextbusRouteScheduleHeaderEntry(e.text, **e.attrib) for e
                       in header.findall('stop')]

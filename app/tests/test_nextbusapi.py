@@ -1,9 +1,11 @@
 import pytest
 from mock import Mock, MagicMock
+from mockredis import mock_redis_client
 import sys, os
 import json
 import requests
 
+import redis
 from flask import Flask
 from flask_cache import Cache
 from flask_restful import Api
@@ -27,15 +29,21 @@ MOCK_MAP = {'agencyList': 'agencyList.xml',
 
 @pytest.fixture
 def mock_app(monkeypatch):
-    #from nextbus import app
+    from nextbus import app
     from nextbus.router import setup_router
-    app = Flask(__name__)
+    #app = Flask(__name__)
+    app.nextbus_api = NextbusApiClient()
     app.api = Api(app)
     app.cache = Cache(app, config={'CACHE_TYPE': 'simple'})
     app.testing = True
     setup_router(app)
     return app
 
+'''
+@pytest.fixture()
+def mock_redis(monkeypatch):
+    monkeypatch.setattr(redis, 'Redis', mock_redis_client)
+'''
 
 @pytest.fixture
 def mock_get_request(monkeypatch):
@@ -84,6 +92,7 @@ def test_agency_list(mock_get_request, mock_app):
     with mock_app.test_request_context('/agency'):
         assert agency_rest.get() == expected_rest
 
+
 def test_route_list(mock_get_request, mock_app):
     api = NextbusApiClient()
     expected = [NextbusRoute(tag='E', title='E-Embarcadero'),
@@ -91,12 +100,13 @@ def test_route_list(mock_get_request, mock_app):
                 NextbusRoute(tag='J', title='J-Church'),
                 NextbusRoute(tag='KT', title='KT-Ingleside/Third Street'),
                 NextbusRoute(tag='L', title='L-Taraval')]
-    assert api.route_list() == expected
 
-    route_rest = Routes()
-    expected_rest = ({'routes': expected}, 200)
     with mock_app.test_request_context('/routes'):
+        assert api.route_list() == expected
+        route_rest = Routes()
+        expected_rest = ({'routes': expected}, 200)
         assert route_rest.get() == expected_rest
+
 
 def test_route_config(mock_get_request, mock_app):
     api = NextbusApiClient()
@@ -123,17 +133,17 @@ def test_route_config(mock_get_request, mock_app):
                                    oppositeColor="000000", latMin="37.7797399",
                                    latMax="37.7954399", lonMin="-122.49335",
                                    lonMax="-122.39682")]
-    assert api.route_config(route_tag="1") == expected
-
-    routecfg_rest = RouteConfig()
-    expected_rest = ({'routeconfig': expected}, 200)
-
-    #with mock_app.test_request_context('/routes/config/1'):
+    with mock_app.test_request_context('/routes/config/1'):
+        assert api.route_config(route_tag="1") == expected
+        routecfg_rest = RouteConfig()
+        expected_rest = ({'routeconfig': expected}, 200)
         #assert routecfg_rest.get() == expected_rest
+
 
 def test_bad_object():
     with pytest.raises(ValueError):
         NextbusPoint(doesnot=False, exist=True)
+
 
 def test_eq_neq():
     a = NextbusPoint(lat="0.0", lon="1.1")
@@ -143,6 +153,7 @@ def test_eq_neq():
     assert a != b
     assert a == c
     assert a != d
+
 
 def test_repr():
     p = NextbusPoint(lat="0.0", lon="1.1")
