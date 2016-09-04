@@ -1,17 +1,19 @@
 import logging
 import xml.etree.ElementTree as ET
 import requests
+from flask import current_app
 from requests.exceptions import ConnectionError
 from json import JSONEncoder
 from retry import retry
 
-from nextbus import app
+#from nextbus.resources.exceptions import ResourceNotFound
+
 
 logger = logging.getLogger('nextbusapi')
 
 DEFAULT_AGENCY = 'sf-muni'
 DEFAULT_ENDPOINT = 'http://webservices.nextbus.com/service/publicXMLFeed'
-CACHE_TTL = 3600
+CACHE_TTL = 30
 
 #
 # XML Api Specification
