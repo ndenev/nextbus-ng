@@ -96,8 +96,8 @@ def test_route_list(mock_get_request, app, mock_redis):
         route_rest = Routes().get()
         assert route_rest == (expected, 200)
 
-'''
-def test_route_config(mock_get_request, mock_app, mock_redis):
+
+def test_route_config(mock_get_request, app, mock_redis):
 
     stops = [NextbusRouteStop(tag='3892',
                               title='California St & Presidio Ave',
@@ -126,13 +126,14 @@ def test_route_config(mock_get_request, mock_app, mock_redis):
                                    latMax="37.7954399", lonMin="-122.49335",
                                    lonMax="-122.39682")]
 
-    with mock_app.test_request_context('/routes/config/1') as ctx:
-        ctx.start = time.time()
-        assert mock_app.nextbus_api.route_config(route_tag="1") == expected
-        #routecfg_rest = RouteConfig()
-        #expected_rest = ({'routeconfig': expected}, 200)
-        #assert routecfg_rest.get() == expected_rest
-'''
+    with app.test_request_context('/routes/config/1') as ctx:
+        #ctx.start = time.time()
+        #assert app.nextbus_api.route_config(route_tag="1") == expected
+        routecfg = RouteConfig().get(tag=1)
+        #expected_rest = (: expected}, 200)
+        assert routecfg == ({'routeconfig': expected}, 200)
+
+
 
 def test_bad_object():
     with pytest.raises(ValueError):
