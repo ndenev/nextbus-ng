@@ -1,5 +1,6 @@
 from flask_restful import reqparse, Resource
 from flask import g, request
+from socket import gethostname
 import time
 from nextbus import app
 from nextbus.common.nextbusapi import NextbusApiError
@@ -9,10 +10,16 @@ SLOW_THRESH = 1.0
 
 @app.teardown_request
 def teardown_request(exception=None):
+    print request.__dict__
     request_time = time.time() - g.start
     if request_time > SLOW_THRESH:
-        app.logger.info("slow request {} time: {}".format(request.url_rule, request_time))
-        app.stats_redis.zadd('slowlog', "{}-{}".format(time.time(), str(request)), request_time)
+        app.logger.info("slow request {} time: {}".format(request.url_rule,
+                                                          request_time))
+        app.stats_redis.zadd('slowlog',
+                             {'time': request_time,
+                              'request': request,
+                              'host': str(gethostname())},
+                             request_time)
         app.stats_redis.zremrangebyrank('slowlog', -1, -5)
 
 class NextbusApiResource(Resource):

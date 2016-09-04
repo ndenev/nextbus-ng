@@ -87,7 +87,7 @@ class NextbusAgency(NextbusObject):
     @NextbusObject.shortTitle.getter
     def shortTitle(self):
         """ Override the shortTitle getter.
-        The short title might be missing in the API response,
+        The short title might be missing in th  e API response,
         so in this case according to the documentation we can
         use the "title" attribute.
         """
@@ -200,6 +200,21 @@ class NextbusRouteSchedule(NextbusObject):
         self._data['header'] = header
         self._data['block'] = blocks
 
+    @staticmethod
+    def from_etree(etree):
+        routes = []
+        for rt in etree.findall('route'):
+            header = rt.find('header')
+            hstops = [NextbusRouteScheduleHeaderEntry(e.text, **e.attrib) for e
+                      in header.findall('stop')]
+            blocks = []
+            for block in rt.findall('tr'):
+                stopdata = [NextbusRouteSchedulePrediction(e.text, **e.attrib)
+                            for e in block.findall('stop')]
+                blocks.append(NextbusRouteScheduleBlock(stopdata,
+                                                        **block.attrib))
+            routes.append(NextbusRouteSchedule(hstops, blocks, **rt.attrib))
+        return routes
 
 class NextbusRouteScheduleHeader(NextbusObject):
     def __init__(self, stops, **params):
@@ -314,19 +329,6 @@ class NextbusApiClient(object):
 
         etree = self._make_request('schedule', params=params)
         return NextbusRouteSchedule.from_etree(etree)
-        routes = []
-        for rt in etree.findall('route'):
-            header = rt.find('header')
-            hstops = [NextbusRouteScheduleHeaderEntry(e.text, **e.attrib) for e
-                      in header.findall('stop')]
-            blocks = []
-            for block in rt.findall('tr'):
-                stopdata = [NextbusRouteSchedulePrediction(e.text, **e.attrib)
-                            for e in block.findall('stop')]
-                blocks.append(NextbusRouteScheduleBlock(stopdata,
-                                                        **block.attrib))
-            routes.append(NextbusRouteSchedule(hstops, blocks, **rt.attrib))
-        return routes
 
 
 class NextbusObjectSerializer(JSONEncoder):
