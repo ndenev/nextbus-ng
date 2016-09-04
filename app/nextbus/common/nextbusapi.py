@@ -105,7 +105,7 @@ class NextbusAgency(NextbusObject):
     @classmethod
     def from_etree(cls, etree):
         return cls(tag=etree.get('tag'),
-                   title=etree.get('tag'),
+                   title=etree.get('title'),
                    shortTitle=etree.get('shortTitle',
                                         etree.get('title')),
                    regionTitle=etree.get('regionTitle'))
@@ -122,9 +122,12 @@ class NextbusRouteList(NextbusObject):
             raise ValueError("Expected NextbusRoute object.")
         self._data['routes'].append(route)
 
-    @staticmethod
-    def from_etree(etree):
-        return [NextbusRoute(**e.attrib) for e in etree.findall('route')]
+    @classmethod
+    def from_etree(cls, etree):
+        route_list = cls()
+        for route in etree.findall('route'):
+            route_list.add_route(NextbusRoute.from_etree(route))
+        return route_list
 
 
 class NextbusRoute(NextbusObject):
@@ -134,17 +137,14 @@ class NextbusRoute(NextbusObject):
     def __init__(self, **params):
         super(NextbusRoute, self).__init__(**params)
 
-    '''
-    @property
-    def shortTitle(self):
-        """ Override the shortTitle getter.
-        The short title might be missing in the API response,
-        so in this case according to the documentation we can
-        use the "title" attribute.
-        """
-        return "XXX"
-        #return self.shortTitle if self.shortTitle else self.title
-    '''
+    @classmethod
+    def from_etree(cls, etree):
+        params = {'tag': etree.get('tag'),
+                  'title': etree.get('title')}
+        short_title = etree.get('shortTitle', None)
+        if short_title:
+            params.update({'shortTitle': short_title})
+        return cls(**params)
 
 
 class NextbusRouteConfigList(NextbusObject):

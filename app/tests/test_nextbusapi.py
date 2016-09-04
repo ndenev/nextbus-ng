@@ -18,6 +18,7 @@ sys.path.insert(0, os.path.realpath(os.path.dirname(__file__)+"/.."))
 
 from nextbus.errors import api_error_map
 from nextbus.common.nextbusapi import NextbusApiClient, NextbusAgency, \
+                                      NextbusAgencyList, NextbusRouteList, \
                                       NextbusRoute, NextbusRouteConfig, \
                                       NextbusRouteStop, NextbusDirection, \
                                       NextbusPath, NextbusPoint, \
@@ -27,7 +28,7 @@ from nextbus.resources import NextbusApiResource, Agency, Routes, \
                               RouteSchedule, RouteConfig
 
 
-'''
+
 
 MOCK_DIR = os.path.join(os.path.realpath(os.path.dirname(__file__)),
                                          'data/nextbus-xml')
@@ -35,30 +36,27 @@ MOCK_MAP = {'agencyList': 'agencyList.xml',
             'routeList': 'routeList.xml'}
 
 
+class MockResponse(object):
+    def __init__(self, *args, **kwargs):
+        assert len(args) == 1
+        assert args[0] == 'http://webservices.nextbus.com/service/publicXMLFeed'
+        self.params = kwargs.get('params', None)
 
+    def raise_for_status(self):
+        pass
 
+    def __repr__(self):
+        return "MockResponse({})".format(self.params)
 
-
+    @property
+    def text(self):
+        xml_file = "{}{}.xml".format(self.params['command'],
+                                   "_r_{}".format(self.params.get('r')) if 'r' in self.params else "")
+        return open(os.path.join(MOCK_DIR, xml_file), 'r').read()
 
 
 @pytest.fixture
 def mock_get_request(monkeypatch):
-
-    class MockResponse(object):
-        def __init__(self, *args, **kwargs):
-            assert len(args) == 1
-            assert args[0] == 'http://webservices.nextbus.com/service/publicXMLFeed'
-            self.params = kwargs.get('params', None)
-
-        def raise_for_status(self):
-            pass
-
-        @property
-        def text(self):
-            xml_file = "{}{}.xml".format(self.params['command'],
-                                       "_r_{}".format(self.params.get('r')) if 'r' in self.params else "")
-            return open(os.path.join(MOCK_DIR, xml_file), 'r').read()
-
     monkeypatch.setattr(requests, 'Response', MockResponse)
 
     def mock_get(*args, **kwargs):
@@ -72,38 +70,32 @@ def test_new_client():
 
 def test_agency_list(monkeypatch, mock_get_request, app, mock_redis):
 
-    expected = [NextbusAgency(tag='sf-muni',
-                              title='San Francisco Muni',
-                              shortTitle='SF Muni',
-                              regionTitle='California-Northern'),
-                NextbusAgency(tag='seattle-sc',
-                              title='Seattle Streetcar',
-                              regionTitle='Washington')]
+    expected = NextbusAgencyList([NextbusAgency(tag='sf-muni',
+                                                title='San Francisco Muni',
+                                                shortTitle='SF Muni',
+                                                regionTitle='California-Northern'),
+                                  NextbusAgency(tag='seattle-sc',
+                                                title='Seattle Streetcar',
+                                                shortTitle='Seattle Streetcar',
+                                                regionTitle='Washington')])
 
     with app.test_request_context('/agency'):
-        #mock_app.stats_redis = mock_redis_client()
-        #assert mock_app.nextbus_api.agency_list() == expected
-        #assert expected[0].shortTitle != expected[0].title
-        #assert expected[1].shortTitle == expected[1].title
-        pass
-        #assert Agency().get() == ({'agency': expected}, 200)
-'''
-'''
-def test_route_list(mock_get_request, mock_app, mock_redis):
+        agencies = Agency().get()
+        assert agencies == (expected, 200)
 
-    expected = [NextbusRoute(tag='E', title='E-Embarcadero'),
-                NextbusRoute(tag='F', title='F-Market & Wharves'),
-                NextbusRoute(tag='J', title='J-Church'),
-                NextbusRoute(tag='KT', title='KT-Ingleside/Third Street'),
-                NextbusRoute(tag='L', title='L-Taraval')]
 
-    with mock_app.test_request_context('/routes'):
-        api = NextbusApiClient()
-        assert api.route_list() == expected
-        route_rest = Routes()
-        expected_rest = ({'routes': expected}, 200)
-        assert route_rest.get() == expected_rest
-'''
+def test_route_list(mock_get_request, app, mock_redis):
+
+    expected = NextbusRouteList([NextbusRoute(tag='E', title='E-Embarcadero'),
+                                 NextbusRoute(tag='F', title='F-Market & Wharves'),
+                                 NextbusRoute(tag='J', title='J-Church'),
+                                 NextbusRoute(tag='KT', title='KT-Ingleside/Third Street'),
+                                 NextbusRoute(tag='L', title='L-Taraval')])
+
+    with app.test_request_context('/routes'):
+        route_rest = Routes().get()
+        assert route_rest == (expected, 200)
+
 '''
 def test_route_config(mock_get_request, mock_app, mock_redis):
 

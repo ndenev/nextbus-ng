@@ -4,6 +4,7 @@ from socket import gethostname
 import json
 import time
 from nextbus.common.nextbusapi import NextbusApiError
+from nextbus.resources.exceptions import ResourceNotFound
 
 CACHE_TTL = 30
 SLOW_THRESH = 2.0
@@ -94,10 +95,9 @@ class Routes(NextbusApiResource):
     def get(self):
         self.counter()
         routes = current_app.nextbus_api.route_list()
-        if routes:
-            return {'routes': routes}, 200
-        else:
-            return {'error': 'resource not found'}, 404
+        if routes is None:
+            raise ResourceNotFound
+        return routes, 200
 
 
 class RouteSchedule(NextbusApiResource):

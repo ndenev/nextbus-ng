@@ -29,7 +29,6 @@ def mock_redis(monkeypatch):
 def app(monkeypatch):
     mock_app = Flask(__name__)
     mock_app.api = Api(mock_app, errors=api_error_map)
-    #mock_app.cache = None
     mock_app.config['CACHE_TYPE'] = 'simple'
     mock_app.cache = Cache(mock_app)
     mock_app.testing = True

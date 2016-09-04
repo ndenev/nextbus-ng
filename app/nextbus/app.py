@@ -26,14 +26,15 @@ def setup_logging(app):
         app.logger.setLevel(logging.DEBUG)
         logger.setLevel(logging.DEBUG)
     else:
-        app.logger.setLevel(logging.DEBUG)
-        logger.setLevel(logging.DEBUG)
+        app.logger.setLevel(logging.INFO)
+        logger.setLevel(logging.INFO)
 
 
-def create_app(config=None, environment=None):
+def create_app(config=None, environment=None, debug=False):
     app = Flask(__name__)
     app.config['ENVIRONMENT'] = environment
     app.config.update(config or {})
+    app.debug = debug
 
     app.api = Api(app, errors=api_error_map)
 
@@ -54,5 +55,5 @@ def create_app(config=None, environment=None):
                                         'cls': NextbusObjectSerializer}})
     from nextbus.resources import teardown_request
     app.teardown_request(teardown_request)
-    
+
     return app
