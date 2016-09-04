@@ -5,12 +5,15 @@ from nextbus import app
 from nextbus.common.nextbusapi import NextbusApiError
 
 CACHE_TTL = 3600
-
+SLOW_THRESH = 1.0
 
 @app.teardown_request
 def teardown_request(exception=None):
-    app.logger.info("request {} time: {}".format(request.url_rule, time.time() - g.start))
-
+    request_time = time.time() - g.start
+    if request_time > SLOW_THRESH:
+        app.logger.info("slow request {} time: {}".format(request.url_rule, request_time))
+        app.stats_redis.zadd('slowlog', "{}-{}".format(time.time(), str(request)), request_time)
+        app.stats_redis.zremrangebyrank('slowlog', -1, -5)
 
 class NextbusApiResource(Resource):
     _display_name = None
@@ -29,6 +32,19 @@ class ApiStats(NextbusApiResource):
                  if k._display_name]
         counts = app.stats_redis.mget(names)
         return {'stats': {k: v if v else 0 for k, v in zip(names, counts)}}
+
+class ApiSlowLog(NextbusApiResource):
+    _display_name = "stats/slowlog"
+
+    def get(self):
+        self.counter()
+        slowlog = []
+        for r, t in app.stats_redis.zrevrangebyscore('slowlog',
+                                                     100,
+                                                     0,
+                                                     withscores=True):
+            slowlog.append({'request': r, 'time': t})
+        return {'slowlog': slowlog }
 
 
 class ApiRoot(NextbusApiResource):

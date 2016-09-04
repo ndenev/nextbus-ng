@@ -4,7 +4,7 @@ from flask import current_app
 from werkzeug.routing import BaseConverter
 from nextbus.resources import Agency, Routes, RouteConfig, \
                               RouteSchedule, StopPredictions, \
-                              ApiStats, ApiRoot
+                              ApiStats, ApiRoot, ApiSlowLog
 from nextbus.resources.exceptions import InvalidRouteTagFormat
 
 
@@ -25,7 +25,7 @@ def setup_router(app):
     setup_routing_converters(app)
     app.api.add_resource(ApiRoot, '/')
     app.api.add_resource(ApiStats, '/stats')
-    #app.api.add_resource(ApiSlowLog, '/stats/slow')
+    app.api.add_resource(ApiSlowLog, '/stats/slowlog')
     app.api.add_resource(Agency, '/agency')
     app.api.add_resource(Routes, '/routes')
     app.api.add_resource(RouteConfig, '/routes/config',
