@@ -1,9 +1,10 @@
 import re
+from datetime import datetime
 
 from werkzeug.routing import BaseConverter
 from nextbus.resources import Agency, Routes, RouteConfig, \
                               RouteSchedule, StopPredictions, \
-                              ApiStats, ApiRoot, ApiSlowLog
+                              ApiStats, ApiRoot, ApiSlowLog, NotInService
 from nextbus.resources.exceptions import InvalidRouteTagFormat
 
 
@@ -16,8 +17,14 @@ class RouteTagConverter(BaseConverter):
         return value
 
 
+class EpochTimeConverter(BaseConverter):
+    def to_python(self, value):
+        return datetime.fromtimestamp(float(value))
+
+
 def setup_routing_converters(app):
     app.url_map.converters['route_tag'] = RouteTagConverter
+    app.url_map.converters['epoch_time'] = EpochTimeConverter
 
 
 def setup_router(app):
@@ -32,4 +39,6 @@ def setup_router(app):
     """ Route schedule endpoint. """
     app.api.add_resource(RouteSchedule, '/routes/schedule',
                                         '/routes/schedule/<route_tag:tag>')
+    app.api.add_resource(NotInService, '/routes/notinservice',
+                                       '/routes/notinservice/<route_tag:tag>')
     app.api.add_resource(StopPredictions, '/predictions')

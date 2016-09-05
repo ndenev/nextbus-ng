@@ -55,6 +55,7 @@ http {
         location / {
             uwsgi_pass {{ trim $host }};
             include uwsgi_params;
+	    uwsgi_read_timeout 300;
         }
     }
 }

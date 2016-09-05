@@ -2,7 +2,7 @@ FROM alpine
 
 MAINTAINER Nikolay Denev <ndenev@gmail.com>
 
-RUN apk add --no-cache bash uwsgi uwsgi-python py-pip && \
+RUN apk add --no-cache bash uwsgi uwsgi-python py-pip ca-certificates && \
     pip install --upgrade pip
 
 ENV APP_DIR /app
@@ -15,7 +15,7 @@ WORKDIR ${APP_DIR}
 RUN find . -name '*.pyc' -delete && \
     pip install -r requirements.txt && \
     pip install pytest pytest-coverage mock mockredispy && \
-    pytest -vvv --cov=nextbus && \
+    pytest -vvv --cov=nextbus --cov-report=term --cov-report=term-missing && \
     pip uninstall -y pytest-coverage pytest mock mockredispy
 
 USER "nobody"

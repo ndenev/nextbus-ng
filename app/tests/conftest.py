@@ -6,7 +6,7 @@ import pytest
 from flask import Flask
 from flask_restful import Api
 from flask_cache import Cache
-import redis
+#import redis
 from mockredis import mock_redis_client
 
 sys.path.insert(0, os.path.realpath(os.path.dirname(__file__)+"/.."))
@@ -18,11 +18,13 @@ def sucket(*args, **kwargs):
 
 socket.socket = sucket
 
-redis.Redis = mock_redis_client
+#redis.Redis = mock_redis_client
+
 
 @pytest.fixture
 def mock_redis(monkeypatch):
-    monkeypatch.setattr(redis, 'Redis', mock_redis_client)
+    pass
+    #monkeypatch.setattr(redis, 'Redis', mock_redis_client)
 
 
 @pytest.fixture

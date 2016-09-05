@@ -426,12 +426,11 @@ class NextbusApiClient(object):
         raise NextbusApiFatalError(err.text)
 
     @retry((ConnectionError, NextbusApiRetriableError), tries=3, delay=10)
-    def _make_request(self, command, params={}, set_agency=True):
+    def _make_request(self, command, params={}, set_agency=True, cache_ttl=CACHE_TTL):
         if set_agency:
             params['a'] = self.agency
         params['command'] = command
 
-        @current_app.cache.memoize(CACHE_TTL)
         def _cached_request(endpoint, params, headers, timeout):
             current_app.logger.info("Making HTTP request to NextbusXMLFeed: "
                                     " {} with params {}".format(endpoint,
@@ -441,19 +440,24 @@ class NextbusApiClient(object):
             req.raise_for_status()
             return req
 
-        req = _cached_request(self.endpoint, params,
-                              self.headers, self.timeout)
+        # abuse the flask-cache decorator so we can set custom ttl per request type
+        cached_request = current_app.cache.memoize(cache_ttl)(_cached_request)
+
+        req = cached_request(self.endpoint, params,
+                             self.headers, self.timeout)
 
         etree = self._parse_xml(req.text)
 
         return etree
 
     def agency_list(self):
-        etree = self._make_request(CMD_AGENCY_LIST, set_agency=False)
+        etree = self._make_request(CMD_AGENCY_LIST,
+                                   set_agency=False,
+                                   cache_ttl=3600)
         return NextbusAgencyList.from_etree(etree)
 
     def route_list(self):
-        etree = self._make_request(CMD_ROUTE_LIST)
+        etree = self._make_request(CMD_ROUTE_LIST, cache_ttl=3600)
         return NextbusRouteList.from_etree(etree)
 
     def route_config(self, route_tag=None, verbose=False, terse=False):
@@ -472,7 +476,9 @@ class NextbusApiClient(object):
         if route_tag is not None:
             params.update({'r': route_tag})
 
-        etree = self._make_request(CMD_ROUTE_SCHEDULE, params=params)
+        etree = self._make_request(CMD_ROUTE_SCHEDULE,
+                                   params=params,
+                                   cache_ttl=3600)
         return NextbusRouteSchedule.from_etree(etree)
 
 
