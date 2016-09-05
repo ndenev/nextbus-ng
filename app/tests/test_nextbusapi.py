@@ -10,7 +10,7 @@ import xml.etree.ElementTree as ET
 from nextbus.common.nextbusapi import NextbusApiClient, NextbusAgency, \
                                       NextbusAgencyList, NextbusRouteList, \
                                       NextbusRoute, NextbusRouteConfig, \
-                                      NextbusRouteConfigList, \
+                                      NextbusRouteConfigList, NextbusPathTag, \
                                       NextbusRouteStop, NextbusDirection, \
                                       NextbusPath, NextbusPoint, \
                                       NextbusDirectionStop, \
@@ -97,21 +97,51 @@ def test_route_list(mock_get_request, app, mock_redis):
         route_list = NextbusRouteList()
         route_list.add_route({'tag': 'z', 'title': 'xxx'})
 
-    short_title_xml = '''\
-<?xml version="1.0" encoding="utf-8" ?>
-<route tag="test" title="test_title" shortTitle="short_title" />
-'''
+    x = '<route tag="test" title="test_title" shortTitle="short_title" />'
 
-    etree = ET.fromstring(short_title_xml)
+    etree = ET.fromstring(x)
     route = NextbusRoute.from_etree(etree)
 
     assert route.get('tag') == "test"
     assert route.get('title') == "test_title"
     assert route.get('shortTitle') == "short_title"
     assert route.get('asdf', 'fdsa') == "fdsa"
-    assert route.get('asdf') == None
+    assert route.get('asdf') is None
 
-'''
+
+def test_route_path():
+
+    # From &verbose output
+    pxv = '''\
+    <path>
+    <tag id="E____I_S10_6_4530_33095"/>
+    <point lat="37.80835" lon="-122.41029"/>
+    <point lat="37.80833" lon="-122.4105"/>
+    <point lat="37.80784" lon="-122.41081"/>
+    </path>'''
+
+    # from normal
+    px = '''\
+    <path>
+    <point lat="37.80835" lon="-122.41029"/>
+    <point lat="37.80833" lon="-122.4105"/>
+    <point lat="37.80784" lon="-122.41081"/>
+    </path>'''
+
+    expected = NextbusPath(points=[NextbusPoint(lat="37.80835",
+                                                lon="-122.41029"),
+                                   NextbusPoint(lat="37.80833",
+                                                lon="-122.4105"),
+                                   NextbusPoint(lat="37.80784",
+                                                lon="-122.41081")])
+    from_etree = NextbusPath.from_etree(ET.fromstring(px))
+    assert from_etree == expected
+
+    expected.add_tag(NextbusPathTag(id="E____I_S10_6_4530_33095"))
+    from_etree_verbose = NextbusPath.from_etree(ET.fromstring(pxv))
+    assert from_etree_verbose == expected
+
+
 def test_route_config(mock_get_request, app, mock_redis):
 
     stops = [NextbusRouteStop(tag='3892',
@@ -144,7 +174,7 @@ def test_route_config(mock_get_request, app, mock_redis):
     with app.test_request_context('/routes/config/1') as ctx:
         routecfg = RouteConfig().get(tag=1)
         assert routecfg == (expected, 200)
-'''
+
 
 
 def test_route_config_list_obj():

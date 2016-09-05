@@ -50,7 +50,6 @@ class NextbusObject(object):
     def __init__(self, **params):
         """ Initialize the object and validate if the provided parameters
         are valid for the specific sub class.
-        Also build getters for all attributes.
         """
         self._data = {}
         for k, v in params.items():
@@ -219,7 +218,11 @@ class NextbusRouteConfig(NextbusObject):
 
     @classmethod
     def from_etree(cls, etree):
-        route_conf = cls()
+        params = {k: etree.get(k) for k in cls._attributes}
+        if not etree.get('useForUI'):
+            del params['useForUI']
+
+        route_conf = cls(**params)
 
         for stop in etree.findall('stop'):
             route_conf.add_stop(NextbusRouteStop.from_etree(stop))
@@ -243,10 +246,12 @@ class NextbusRouteStop(NextbusObject):
     def from_etree(cls, etree):
         params = {'tag': etree.get('tag'),
                   'title': etree.get('title'),
-                  'shortTitle': etree.get('shortTitle'),
                   'lat': etree.get('lat'),
                   'lon': etree.get('lon'),
                   'stopId': etree.get('stopId')}
+        short_title = etree.get('shortTitle')
+        if short_title:
+            params.update({'shortTitle': short_title})
         return cls(**params)
 
 
@@ -266,18 +271,34 @@ class NextbusDirection(NextbusObject):
 
     @classmethod
     def from_etree(cls, etree):
-        direction = cls()
+        params = {'tag': etree.get('tag'),
+                  'title': etree.get('title'),
+                  'name': etree.get('name')}
+        use_for_ui = etree.get('useForUI')
+        if use_for_ui:
+            params.update({'useForUI': use_for_ui})
+        direction = cls(**params)
         for stop in etree.findall('stop'):
             direction.add_stop(NextbusDirectionStop.from_etree(stop))
         return direction
 
 
 class NextbusPath(NextbusObject):
-    def __init__(self, points=[]):
+    def __init__(self, points=[], tags=[]):
         super(NextbusPath, self).__init__()
+
+        self._data['tag'] = []
+        for tag in tags:
+            self.add_tag(tag)
+
         self._data['point'] = []
         for point in points:
             self.add_point(point)
+
+    def add_tag(self, tag):
+        if not isinstance(tag, NextbusPathTag):
+            raise ValueError("Expected NextbusPathTag")
+        self._data['tag'].append(tag)
 
     def add_point(self, point):
         if not isinstance(point, NextbusPoint):
@@ -287,9 +308,25 @@ class NextbusPath(NextbusObject):
     @classmethod
     def from_etree(cls, etree):
         path = cls()
-        for point in etree.find('point'):
+
+        for tag in etree.iter('tag'):
+            path.add_tag(NextbusPathTag.from_etree(tag))
+
+        for point in etree.iter('point'):
             path.add_point(NextbusPoint.from_etree(point))
+
         return path
+
+
+class NextbusPathTag(NextbusObject):
+    _attributes = ['id']
+
+    def __init__(self, **params):
+        super(NextbusPathTag, self).__init__(**params)
+
+    @classmethod
+    def from_etree(cls, etree):
+        return cls(id=etree.get('id'))
 
 
 class NextbusPoint(NextbusObject):
@@ -300,7 +337,9 @@ class NextbusPoint(NextbusObject):
 
     @classmethod
     def from_etree(cls, etree):
-        return cls(etree.get('lat'), etree.get('lon'))
+        params = {'lat': etree.get('lat'),
+                  'lon': etree.get('lon')}
+        return cls(**params)
 
 
 class NextbusDirectionStop(NextbusObject):
