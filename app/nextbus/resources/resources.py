@@ -159,9 +159,9 @@ class NotInService(NextbusApiResource):
 
         current_app.logger.info("THE TIME IS: {}".format(check_time))
 
-        route_service_availability = {}
+        route_availability = {}
 
-        def time_in_range(start, end, x):
+        def _time_in_range(start, end, x):
             if start <= end:
                 return start <= x <= end
             else:
@@ -176,7 +176,7 @@ class NotInService(NextbusApiResource):
                 tags_to_check.append(tag)
 
         for tag in tags_to_check:
-            route_service_availability[tag] = False
+            route_availability[tag] = False
             #tag = route.get('tag')
             schedules = current_app.nextbus_api.route_schedule(tag)
             service_start_times = []
@@ -190,13 +190,12 @@ class NotInService(NextbusApiResource):
                 last_bus = self._find_last_bus_in_schedule(schedule)
                 #current_app.logger.info("last bus {} for schedule".format(last_bus))
                 service_end_times.append(last_bus)
-                if time_in_range(first_bus, last_bus, check_time):
+                if _time_in_range(first_bus, last_bus, check_time):
                     current_app.logger.info("There is service for route {} at {}".format(tag, check_time))
-                    route_service_availability[tag] = True
+                    route_availability[tag] = True
 
             #current_app.logger.info('Route {} starts at {} and ends at {}'.format(tag, service_start_time, service_end_time))
-            #sched.update({tag: schedules})
-        return {'route_service_availability': route_service_availability}, 200
+        return {'notinservice': [k for k,v in route_availability.items() if v is False]}, 200
 
 
 class StopPredictions(NextbusApiResource):
