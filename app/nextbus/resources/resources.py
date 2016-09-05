@@ -129,11 +129,11 @@ class RouteConfig(NextbusApiResource):
         parser.add_argument('verbose', type=bool)
         parser.add_argument('terse', type=bool)
         args = parser.parse_args()
-        try:
-            current_app.logger.info("getting route_config list and memoizing")
-            routes = current_app.nextbus_api.route_config(tag,
-                                                  verbose=args.verbose,
-                                                  terse=args.terse)
-            return {'routeconfig': routes}, 200
-        except NextbusApiError as e:
-            return {'error': e.message}, 404
+
+        routes = current_app.nextbus_api.route_config(tag,
+                                                      verbose=args.verbose,
+                                                      terse=args.terse)
+
+        if routes is None:
+            raise ResourceNotFound
+        return routes, 200

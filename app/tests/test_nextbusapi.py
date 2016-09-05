@@ -1,28 +1,21 @@
-
 import os
-import sys
-import time
-
-import requests
-import redis
-
-from flask import Flask
-from flask_cache import Cache
-from flask_restful import Api
+#import sys
 
 import pytest
-from mock import Mock, MagicMock
-from mockredis import mock_redis_client
+import requests
+import xml.etree.ElementTree as ET
 
-sys.path.insert(0, os.path.realpath(os.path.dirname(__file__)+"/.."))
+#sys.path.insert(0, os.path.realpath(os.path.dirname(__file__)+"/.."))
 
-from nextbus.errors import api_error_map
 from nextbus.common.nextbusapi import NextbusApiClient, NextbusAgency, \
                                       NextbusAgencyList, NextbusRouteList, \
                                       NextbusRoute, NextbusRouteConfig, \
+                                      NextbusRouteConfigList, \
                                       NextbusRouteStop, NextbusDirection, \
                                       NextbusPath, NextbusPoint, \
-                                      NextbusDirectionStop
+                                      NextbusDirectionStop, \
+                                      NextbusRouteSchedulePrediction, \
+                                      NextbusRouteScheduleBlock
 
 from nextbus.resources import NextbusApiResource, Agency, Routes, \
                               RouteSchedule, RouteConfig
@@ -83,6 +76,10 @@ def test_agency_list(monkeypatch, mock_get_request, app, mock_redis):
         agencies = Agency().get()
         assert agencies == (expected, 200)
 
+    with pytest.raises(ValueError):
+        agency_list = NextbusAgencyList()
+        agency_list.add_agency({'tag': 'z', 'title': 'xxx'})
+
 
 def test_route_list(mock_get_request, app, mock_redis):
 
@@ -96,7 +93,25 @@ def test_route_list(mock_get_request, app, mock_redis):
         route_rest = Routes().get()
         assert route_rest == (expected, 200)
 
+    with pytest.raises(ValueError):
+        route_list = NextbusRouteList()
+        route_list.add_route({'tag': 'z', 'title': 'xxx'})
 
+    short_title_xml = '''\
+<?xml version="1.0" encoding="utf-8" ?>
+<route tag="test" title="test_title" shortTitle="short_title" />
+'''
+
+    etree = ET.fromstring(short_title_xml)
+    route = NextbusRoute.from_etree(etree)
+
+    assert route.get('tag') == "test"
+    assert route.get('title') == "test_title"
+    assert route.get('shortTitle') == "short_title"
+    assert route.get('asdf', 'fdsa') == "fdsa"
+    assert route.get('asdf') == None
+
+'''
 def test_route_config(mock_get_request, app, mock_redis):
 
     stops = [NextbusRouteStop(tag='3892',
@@ -120,19 +135,43 @@ def test_route_config(mock_get_request, app, mock_redis):
                           NextbusPoint(lat='37.78154', lon='-122.49335')]),
              NextbusPath([NextbusPoint(lat='37.78727', lon='-122.44696'),
                           NextbusPoint(lat='37.78692', lon='-122.44996')])]
-    expected = [NextbusRouteConfig(stops, directions, paths, tag="1",
-                                   title="1-California", color="cc6600",
-                                   oppositeColor="000000", latMin="37.7797399",
-                                   latMax="37.7954399", lonMin="-122.49335",
-                                   lonMax="-122.39682")]
+    expected = NextbusRouteConfigList([NextbusRouteConfig(stops, directions, paths, tag="1",
+                                       title="1-California", color="cc6600",
+                                       oppositeColor="000000", latMin="37.7797399",
+                                       latMax="37.7954399", lonMin="-122.49335",
+                                       lonMax="-122.39682")])
 
     with app.test_request_context('/routes/config/1') as ctx:
-        #ctx.start = time.time()
-        #assert app.nextbus_api.route_config(route_tag="1") == expected
         routecfg = RouteConfig().get(tag=1)
-        #expected_rest = (: expected}, 200)
-        assert routecfg == ({'routeconfig': expected}, 200)
+        assert routecfg == (expected, 200)
+'''
 
+
+def test_route_config_list_obj():
+    nrcl = NextbusRouteConfigList()
+
+    nrc1 = NextbusRouteConfig()
+    nrc2 = NextbusRouteConfig()
+    nrc3 = NextbusRouteConfig()
+
+    for rc in [nrc1, nrc2, nrc3]:
+        nrcl.add_route_config(rc)
+
+    assert NextbusRouteConfigList(routes=[nrc1, nrc2, nrc3])
+
+
+
+def test_route_schedule_prediction_obj():
+    nrsp = NextbusRouteSchedulePrediction("00:00", tag='tag', epochTime=666)
+    assert nrsp.get('time') == "00:00"
+    assert nrsp.get('tag') == 'tag'
+    assert nrsp.get('epochTime') == 666
+
+
+def test_route_schedule_block_obj():
+    nrsb = NextbusRouteScheduleBlock([], blockID="xxx")
+    assert nrsb.get('blockID') == "xxx"
+    assert nrsb.get('stop_prediction') == []
 
 
 def test_bad_object():
@@ -150,6 +189,7 @@ def test_eq_neq():
     assert a != d
 
 
-def test_repr():
+def test_repr_and_str():
     p = NextbusPoint(lat="0.0", lon="1.1")
     assert repr(p) == "NextbusPoint(lat='0.0', lon='1.1')"
+    assert str(p) == "NextbusPoint(lat='0.0', lon='1.1')"
