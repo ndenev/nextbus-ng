@@ -1,11 +1,9 @@
 import os
-#import sys
+import json
 
 import pytest
 import requests
 import xml.etree.ElementTree as ET
-
-#sys.path.insert(0, os.path.realpath(os.path.dirname(__file__)+"/.."))
 
 from nextbus.common.nextbusapi import NextbusApiClient, NextbusAgency, \
                                       NextbusAgencyList, NextbusRouteList, \
@@ -17,16 +15,11 @@ from nextbus.common.nextbusapi import NextbusApiClient, NextbusAgency, \
                                       NextbusRouteSchedulePrediction, \
                                       NextbusRouteScheduleBlock
 
-from nextbus.resources import NextbusApiResource, Agency, Routes, \
-                              RouteSchedule, RouteConfig
-
-
-
+from nextbus.resources import Agency, Routes, RouteSchedule, RouteConfig
+from nextbus.resources.exceptions import InvalidRouteTagFormat
 
 MOCK_DIR = os.path.join(os.path.realpath(os.path.dirname(__file__)),
                                          'data/nextbus-xml')
-MOCK_MAP = {'agencyList': 'agencyList.xml',
-            'routeList': 'routeList.xml'}
 
 
 class MockResponse(object):
@@ -171,10 +164,47 @@ def test_route_config(mock_get_request, app, mock_redis):
                                        latMax="37.7954399", lonMin="-122.49335",
                                        lonMax="-122.39682")])
 
-    with app.test_request_context('/routes/config/1') as ctx:
+    with app.test_request_context('/routes/config/1'):
         routecfg = RouteConfig().get(tag=1)
         assert routecfg == (expected, 200)
 
+
+def test_bad_route(mock_get_request, app):
+    with app.test_client() as c:
+        #TODO: this should not raise, but set 4xx response code
+        with pytest.raises(InvalidRouteTagFormat):
+            resp = c.get('/routes/config/_Invalid_$Route_#name')
+        #data = json.loads(resp.data)
+        #assert resp.status_code == 500
+
+
+def test_notinservice_all(mock_get_request, app):
+
+    expected = {"notinservice": ["E", "KT"]}
+
+    with app.test_client() as c:
+        resp = c.get('/routes/notinservice?time=1473142292')
+        data = json.loads(resp.data)
+        assert resp.status_code == 200
+        assert data == expected
+
+
+def test_notinservice_single(mock_get_request, app):
+
+    expected_E = {"notinservice": ["E"]}
+    expected_L = {"notinservice": []}
+
+    with app.test_client() as c:
+        resp = c.get('/routes/notinservice/E?time=1473142292')
+        data = json.loads(resp.data)
+        assert resp.status_code == 200
+        assert data == expected_E
+
+    with app.test_client() as c:
+        resp = c.get('/routes/notinservice/L?time=1473142292')
+        data = json.loads(resp.data)
+        assert resp.status_code == 200
+        assert data == expected_L
 
 
 def test_route_config_list_obj():

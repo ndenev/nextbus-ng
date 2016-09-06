@@ -17,14 +17,8 @@ class RouteTagConverter(BaseConverter):
         return value
 
 
-class EpochTimeConverter(BaseConverter):
-    def to_python(self, value):
-        return datetime.fromtimestamp(float(value))
-
-
 def setup_routing_converters(app):
     app.url_map.converters['route_tag'] = RouteTagConverter
-    app.url_map.converters['epoch_time'] = EpochTimeConverter
 
 
 def setup_router(app):
