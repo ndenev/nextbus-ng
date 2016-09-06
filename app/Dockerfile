@@ -16,7 +16,8 @@ RUN find . -name '*.pyc' -delete && \
     pip install -r requirements.txt && \
     pip install pytest pytest-coverage mock mockredispy && \
     pytest -vvv --cov=nextbus --cov-report=term --cov-report=term-missing && \
-    pip uninstall -y pytest-coverage pytest mock mockredispy
+    pip uninstall -y pytest-coverage pytest mock mockredispy \
+    rm -rf tests
 
 USER "nobody"
 
