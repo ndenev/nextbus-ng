@@ -155,10 +155,10 @@ class NotInService(NextbusApiResource):
     def get(self, tag=None):
         self.counter()
         parser = reqparse.RequestParser()
-        parser.add_argument('time', type=float)
+        parser.add_argument('time', type=float, default=float(time.time()))
         args = parser.parse_args()
 
-        check_time = datetime.fromtimestamp(args.get('time', time.time()))
+        check_time = datetime.fromtimestamp(args.get('time'))
         service_class = self._get_serviceclass(check_time)
         check_time = check_time.time()
 
