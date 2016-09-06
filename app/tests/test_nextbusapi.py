@@ -1,5 +1,6 @@
 import os
 import json
+import gzip
 
 import pytest
 import requests
@@ -36,9 +37,9 @@ class MockResponse(object):
 
     @property
     def text(self):
-        xml_file = "{}{}.xml".format(self.params['command'],
+        xml_file = "{}{}.xml.gz".format(self.params['command'],
                                    "_r_{}".format(self.params.get('r')) if 'r' in self.params else "")
-        return open(os.path.join(MOCK_DIR, xml_file), 'r').read()
+        return gzip.open(os.path.join(MOCK_DIR, xml_file), 'rb').read()
 
 
 @pytest.fixture
