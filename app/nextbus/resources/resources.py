@@ -17,6 +17,11 @@ SLOW_LOG_SIZE = 50
 
 def teardown_request(exception=None):
     """ We are logging slow queries here. """
+    if exception is not None:
+        current_app.logger.exception(exception)
+        return
+    if 'start' not in g:
+        return
     request_time = time.time() - g.start
     if request_time > SLOW_THRESH:
         current_app.logger.info("logging slow request {} time: {}".format(
