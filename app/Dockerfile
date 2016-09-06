@@ -14,10 +14,10 @@ COPY . /app/
 WORKDIR ${APP_DIR}
 RUN find . -name '*.pyc' -delete && \
     pip install -r requirements.txt && \
-    pip install pytest pytest-coverage mock mockredispy && \
+    pip install -r test-requirements.txt && \
     pytest -vvv --cov=nextbus --cov-report=term --cov-report=term-missing && \
-    pip uninstall -y pytest-coverage pytest mock mockredispy \
-    rm -rf tests
+    pip uninstall -y -r test-requirements.txt && \
+    rm -rf "${APP_DIR}/tests"
 
 USER "nobody"
 
