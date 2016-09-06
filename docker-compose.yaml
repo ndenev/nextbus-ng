@@ -12,7 +12,6 @@ services:
     depends_on:
      - redis1
      - redis2
-    dns: 10.0.2.2
     environment:
      - VIRTUAL_HOST=nextbus-web
      - VIRTUAL_PORT=8080
