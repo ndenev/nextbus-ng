@@ -1,7 +1,7 @@
 import re
 from datetime import datetime
-
-from werkzeug.routing import BaseConverter
+from flask import current_app, make_response
+from werkzeug.routing import BaseConverter, ValidationError
 from nextbus.resources import Agency, Routes, RouteConfig, \
                               RouteSchedule, StopPredictions, \
                               ApiStats, ApiRoot, ApiSlowLog, NotInService
@@ -13,7 +13,7 @@ class RouteTagConverter(BaseConverter):
 
     def to_python(self, value):
         if not self._re.match(value):
-            raise InvalidRouteTagFormat
+            raise ValidationError('Invalid Route Tag Format')
         return value
 
 

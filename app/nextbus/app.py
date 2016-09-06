@@ -8,6 +8,8 @@ from redis import Redis
 from nextbus.common.config import APP_CONFIG, REDIS_CONFIG
 from nextbus.errors import api_error_map
 from nextbus.common.nextbusapi import NextbusApiClient
+from nextbus.resources.exceptions import ResourceNotFound, \
+                                         InvalidRouteTagFormat
 
 __author__ = "ndenev@gmail.com"
 
@@ -29,6 +31,19 @@ def setup_logging(app):
         app.logger.setLevel(logging.INFO)
         logger.setLevel(logging.INFO)
 
+def setup_errorhandlers(app):
+    @app.errorhandler(ResourceNotFound)
+    def handle_resource_not_found(error):
+        response = {'error': 'resource not found'}
+        response.status_code = 404
+        return response
+
+    @app.errorhandler(InvalidRouteTagFormat)
+    def handle_resource_not_found(error):
+        response = {'error': 'invalid route tag format'}
+        response.status_code = 400
+        return response
+
 
 def create_app(config=None, environment=None, debug=False):
     app = Flask(__name__)
@@ -36,7 +51,7 @@ def create_app(config=None, environment=None, debug=False):
     app.config.update(config or {})
     app.debug = debug
 
-    app.api = Api(app, errors=api_error_map)
+    app.api = Api(app, errors=api_error_map, catch_all_404s=True)
 
     app.cache = Cache(app, config=APP_CONFIG['flask_cache_config'])
 
@@ -55,5 +70,6 @@ def create_app(config=None, environment=None, debug=False):
                                         'cls': NextbusObjectSerializer}})
     from nextbus.resources import teardown_request
     app.teardown_request(teardown_request)
+    setup_errorhandlers(app)
 
     return app

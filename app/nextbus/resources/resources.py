@@ -8,7 +8,7 @@ import json
 import time
 
 from nextbus.common.nextbusapi import NextbusApiError
-from nextbus.resources.exceptions import ResourceNotFound
+from nextbus.resources.exceptions import ResourceNotFound, InvalidRouteTagFormat
 
 CACHE_TTL = 30
 SLOW_THRESH = 2.0

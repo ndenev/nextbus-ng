@@ -416,7 +416,8 @@ class NextbusApiClient(object):
         self.headers = {'Accept-Encoding': 'gzip, deflate'}
         self.timeout = 10
 
-    def _parse_xml(self, text):
+    @staticmethod
+    def _parse_xml(text):
         etree = ET.fromstring(text)
         err = etree.find('Error')
         if err is None:

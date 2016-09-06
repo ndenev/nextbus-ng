@@ -1,5 +1,9 @@
 
 api_error_map = {
+    'ValidationError': {
+        'message': 'fatal error',
+        'status': 400,
+    },
     'InvalidRouteTagFormat': {
         'message': "Invalid route tag specified.",
         'status': 400,
