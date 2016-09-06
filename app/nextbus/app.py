@@ -51,7 +51,10 @@ def create_app(config=None, environment=None, debug=False):
     app.config.update(config or {})
     app.debug = debug
 
-    app.api = Api(app, errors=api_error_map, catch_all_404s=True)
+    app.api = Api(app,
+                  prefix='/api/v1',
+                  errors=api_error_map,
+                  catch_all_404s=True)
 
     app.cache = Cache(app, config=APP_CONFIG['flask_cache_config'])
 

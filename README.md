@@ -21,10 +21,19 @@ used with RR DNS.
 
 #### Frontend Endpoints
 
-*   `/nextbus-ng/v1/cmd<nextbus_api_cmd>?<p1>=<v1>..&<p2=v2>`
-*   `/nextbus-ng/v1/notrunning`
-*   `/nextbus-ng/v1/stats/hits`
-*   `/nextbus-ng/v1/stats/slow`
+*   `/api/v1/` - List of API endpoints.
+*   `/api/v1/agency` - List of Nexbus agencies. This API implements calls only to "sf-muni".
+*   `/api/v1/routes` - List of "sf-muni" routes.
+*   `/api/v1/routes/config` - Configuration for all "sf-muni" routes. This call can return a lot of data!.
+*   `/api/v1/routes/config/<route_tag>` - Configuration for a given route. Route tags are retrieved using the `/api/v1/routes` endpoint.
+*   `/api/v1/notinservice?time=<unix_timestamp>` - List of routes not running at the given time specified by the *unix_timestamp* argument. This call retrieves large amount of data on the backend and can take some time if the redis cache is cold.
+*   `/api/v1/notinservice/<route_tag>?time=<unix_timestamp>` - Check if a given route specified by the *route_tag* argument runs at the given time specified by *unix_timestamp*
+*   `/api/v1/routes/schedule` - List of all routes schedules if the agency supports it. **NOTE: "sf-muni" does not support this call**
+*   `/api/v1/routes/schedule/<route_tag>` - Get the schedules for a given route specified by *<route_tag*.
+*   `/api/v1/stats` - Get request statistics for all API endpoints.
+*   `/api/v1/stats/slowlog` - Get list of the top 50 slow requests (requests that took more than 2 seconds).
+
+At present the *messages*, *predictions* and *predictionsForMultiStops* API calls are not implemented.
 
 ### Backend
 
