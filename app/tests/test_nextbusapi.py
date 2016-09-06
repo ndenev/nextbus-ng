@@ -55,7 +55,7 @@ def test_new_client():
     assert(NextbusApiClient())
 
 
-def test_agency_list(monkeypatch, mock_get_request, app, mock_redis):
+def test_agency_list(monkeypatch, mock_get_request, app):
 
     expected = NextbusAgencyList([NextbusAgency(tag='sf-muni',
                                                 title='San Francisco Muni',
@@ -66,7 +66,7 @@ def test_agency_list(monkeypatch, mock_get_request, app, mock_redis):
                                                 shortTitle='Seattle Streetcar',
                                                 regionTitle='Washington')])
 
-    with app.test_request_context('/agency'):
+    with app.test_request_context('/api/v1/agency'):
         agencies = Agency().get()
         assert agencies == (expected, 200)
 
@@ -75,7 +75,7 @@ def test_agency_list(monkeypatch, mock_get_request, app, mock_redis):
         agency_list.add_agency({'tag': 'z', 'title': 'xxx'})
 
 
-def test_route_list(mock_get_request, app, mock_redis):
+def test_route_list(mock_get_request, app):
 
     expected = NextbusRouteList([NextbusRoute(tag='E', title='E-Embarcadero'),
                                  NextbusRoute(tag='F', title='F-Market & Wharves'),
@@ -83,7 +83,7 @@ def test_route_list(mock_get_request, app, mock_redis):
                                  NextbusRoute(tag='KT', title='KT-Ingleside/Third Street'),
                                  NextbusRoute(tag='L', title='L-Taraval')])
 
-    with app.test_request_context('/routes'):
+    with app.test_request_context('/api/v1/routes'):
         route_rest = Routes().get()
         assert route_rest == (expected, 200)
 
@@ -136,7 +136,7 @@ def test_route_path():
     assert from_etree_verbose == expected
 
 
-def test_route_config(mock_get_request, app, mock_redis):
+def test_route_config(mock_get_request, app):
 
     stops = [NextbusRouteStop(tag='3892',
                               title='California St & Presidio Ave',
@@ -165,18 +165,15 @@ def test_route_config(mock_get_request, app, mock_redis):
                                        latMax="37.7954399", lonMin="-122.49335",
                                        lonMax="-122.39682")])
 
-    with app.test_request_context('/routes/config/1'):
+    with app.test_request_context('/api/v1/routes/config/1'):
         routecfg = RouteConfig().get(tag=1)
         assert routecfg == (expected, 200)
 
 
 def test_bad_route(mock_get_request, app):
     with app.test_client() as c:
-        #TODO: this should not raise, but set 4xx response code
-        with pytest.raises(InvalidRouteTagFormat):
-            resp = c.get('/routes/config/_Invalid_$Route_#name')
-        #data = json.loads(resp.data)
-        #assert resp.status_code == 500
+        resp = c.get('/api/v1/routes/config/_Invalid_$Route_#name')
+        assert resp.status_code == 404
 
 
 def test_notinservice_all(mock_get_request, app):
@@ -184,7 +181,7 @@ def test_notinservice_all(mock_get_request, app):
     expected = {"notinservice": ["E", "KT"]}
 
     with app.test_client() as c:
-        resp = c.get('/routes/notinservice?time=1473142292')
+        resp = c.get('/api/v1/routes/notinservice?time=1473142292')
         data = json.loads(resp.data)
         assert resp.status_code == 200
         assert data == expected
@@ -196,13 +193,14 @@ def test_notinservice_single(mock_get_request, app):
     expected_L = {"notinservice": []}
 
     with app.test_client() as c:
-        resp = c.get('/routes/notinservice/E?time=1473142292')
+        resp = c.get('/api/v1/routes/notinservice/E?time=1473142292')
+        print resp
         data = json.loads(resp.data)
         assert resp.status_code == 200
         assert data == expected_E
 
     with app.test_client() as c:
-        resp = c.get('/routes/notinservice/L?time=1473142292')
+        resp = c.get('/api/v1/routes/notinservice/L?time=1473142292')
         data = json.loads(resp.data)
         assert resp.status_code == 200
         assert data == expected_L
